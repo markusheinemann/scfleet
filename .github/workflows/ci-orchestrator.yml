@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -37,7 +37,7 @@ jobs:
           coverage: none
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: actions/cache@v4
+        uses: setup-node@v5
         with:
           path: orchestrator/vendor
           key: composer-8_4-${{ hashFiles('orchestrator/composer.lock') }}
@@ -45,7 +45,7 @@ jobs:
       - name: Install Dependecies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
       - name: Run Pint
-        run: ./vendor/bin/pint
+        run: ./vendor/bin/pint --test
 
   test_mysql:
     name: Tests - MySQL ${{ matrix.mysql }} - PHP ${{ matrix.php }}
@@ -69,7 +69,7 @@ jobs:
           --health-retries=10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -78,13 +78,23 @@ jobs:
           coverage: xdebug
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: actions/cache@v4
+        uses: setup-node@v5
         with:
           path: orchestrator/vendor
           key: composer-${{ matrix.php }}-${{ hashFiles('orchestrator/composer.lock') }}
           restore-keys: composer-${{ matrix.php }}-
       - name: Install Dependecies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: orchestrator/package-lock.json
+      - name: Install npm Dependencies
+        run: npm install
+      - name: Build frontend assets
+        run: npm run build
       - name: Prepare .env.testing
         run: |
           cp .env.example .env.testing
@@ -150,7 +160,7 @@ jobs:
           --health-retries=10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -159,13 +169,23 @@ jobs:
           coverage: xdebug
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: actions/cache@v4
+        uses: setup-node@v5
         with:
           path: orchestrator/vendor
           key: composer-${{ matrix.php }}-${{ hashFiles('orchestrator/composer.lock') }}
           restore-keys: composer-${{ matrix.php }}-
       - name: Install Dependecies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: orchestrator/package-lock.json
+      - name: Install npm Dependencies
+        run: npm install
+      - name: Build frontend assets
+        run: npm run build
       - name: Prepare .env.testing
         run: |
           cp .env.example .env.testing
@@ -201,15 +221,15 @@ jobs:
     name: Lint Frontend
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: orchestrator/package-lock.json
       - name: Install npm Dependencies
-        run: npm ci
+        run: npm install
       - name: Run linter
         run: npm run lint
 
@@ -217,31 +237,16 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: orchestrator/package-lock.json
       - name: Install npm Dependencies
-        run: npm ci
+        run: npm install
       - name: Build frontend assets
         run: npm run build
       - name: Check build output exists
         run: test -d public/build
-
-  ci-orchestrator-ok:
-    name: Orchestrator CI — all checks passed
-    runs-on: ubuntu-24.04
-    needs: [lint, test_mysql, test_pgsql, frontend_build, frontend_lint]
-    if: always()
-    steps:
-      - name: Check all jobs succeeded
-        run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || \
-                "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "One or more required jobs failed."
-            exit 1
-          fi
-          echo "All checks passed."
