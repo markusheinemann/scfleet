@@ -37,7 +37,7 @@ jobs:
           coverage: none
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: setup-node@v5
+        uses: actions/setup-node@v6
         with:
           path: orchestrator/vendor
           key: composer-8_4-${{ hashFiles('orchestrator/composer.lock') }}
@@ -78,7 +78,7 @@ jobs:
           coverage: xdebug
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: setup-node@v5
+        uses: actions/setup-node@v6
         with:
           path: orchestrator/vendor
           key: composer-${{ matrix.php }}-${{ hashFiles('orchestrator/composer.lock') }}
@@ -169,7 +169,7 @@ jobs:
           coverage: xdebug
           tools: composer:v2
       - name: Cache Composer Packages
-        uses: setup-node@v5
+        uses: actions/setup-node@v6
         with:
           path: orchestrator/vendor
           key: composer-${{ matrix.php }}-${{ hashFiles('orchestrator/composer.lock') }}
