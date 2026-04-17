@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: orchestrator
+      POSTGRES_USER: scfleet
+      POSTGRES_PASSWORD: secret
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scfleet -d orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  orchestrator:
+    build: ./orchestrator
+    ports:
+      - "8080:80"
+    environment:
+      APP_NAME: "Scraper Fleet"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:ErFXk3J1DXM/op0kITubWsB6BkgbK3NiW0gFpmnILjo=
+      APP_URL: http://localhost:8080
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: orchestrator
+      DB_USERNAME: scfleet
+      DB_PASSWORD: secret
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: debug
+      DEV_AGENT_TOKEN: dev-agent-token
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/up"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  agent:
+    build: ./agent
+    command:
+      - --url=http://orchestrator
+      - --token=dev-agent-token
+      - --interval=30s
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  db-data:
