@@ -12,9 +12,9 @@ enum Role: string
     public function permissions(): array
     {
         return match ($this) {
-            Role::Admin => [Permission::ManageUsers, Permission::ViewUsers],
-            Role::Editor => [],
-            Role::Viewer => [],
+            Role::Admin => [Permission::ManageUsers, Permission::ViewUsers, Permission::ManageAgents, Permission::ViewAgents, Permission::RegenerateAgentToken],
+            Role::Editor => [Permission::ManageAgents, Permission::ViewAgents],
+            Role::Viewer => [Permission::ViewAgents],
         };
     }
 }

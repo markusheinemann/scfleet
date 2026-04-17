@@ -114,15 +114,21 @@ describe('user model permission helpers', function (): void {
 });
 
 describe('role permissions mapping', function (): void {
-    it('admin has manage-users and view-users permissions', function (): void {
-        expect(Role::Admin->permissions())->toBe([Permission::ManageUsers, Permission::ViewUsers]);
+    it('admin has all permissions', function (): void {
+        expect(Role::Admin->permissions())->toBe([
+            Permission::ManageUsers,
+            Permission::ViewUsers,
+            Permission::ManageAgents,
+            Permission::ViewAgents,
+            Permission::RegenerateAgentToken,
+        ]);
     });
 
-    it('editor has no permissions', function (): void {
-        expect(Role::Editor->permissions())->toBe([]);
+    it('editor has agent permissions', function (): void {
+        expect(Role::Editor->permissions())->toBe([Permission::ManageAgents, Permission::ViewAgents]);
     });
 
-    it('viewer has no permissions', function (): void {
-        expect(Role::Viewer->permissions())->toBe([]);
+    it('viewer can only view agents', function (): void {
+        expect(Role::Viewer->permissions())->toBe([Permission::ViewAgents]);
     });
 });
