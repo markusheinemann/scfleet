@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button';
+
 export default function Index() {
-  return 'Hello, World';
+  return <Button>Shadcn is working</Button>;
 }
