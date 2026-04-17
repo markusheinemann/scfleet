@@ -1,5 +1,7 @@
-import { Button } from '@/components/ui/button';
+import DashboardLayout from '@/layouts/dashboard-layout';
 
 export default function Index() {
-  return <Button>Shadcn is working</Button>;
+  return <div className="text-muted-foreground text-sm">Welcome to Scraper Fleet.</div>;
 }
+
+Index.layout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;
