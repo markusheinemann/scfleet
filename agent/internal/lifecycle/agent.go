@@ -31,6 +31,10 @@ func New(client APIClient, interval time.Duration, logger *slog.Logger) *Agent {
 
 // Run registers the agent, then sends heartbeats until ctx is cancelled.
 func (a *Agent) Run(ctx context.Context) error {
+	if a.interval <= 0 {
+		return fmt.Errorf("invalid heartbeat interval: %s", a.interval)
+	}
+
 	a.logger.Info("registering with orchestrator")
 
 	if err := a.client.Register(ctx); err != nil {

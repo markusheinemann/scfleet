@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -41,11 +42,12 @@ func (c *Client) Heartbeat(ctx context.Context) error {
 }
 
 func (c *Client) post(ctx context.Context, path string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, nil)
+	target, err := url.JoinPath(c.baseURL, path)
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return fmt.Errorf("build url: %w", err)
 	}
 
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, target, nil)
 	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	c.logger.Debug("sending request", "method", http.MethodPost, "url", req.URL.String())
@@ -55,7 +57,7 @@ func (c *Client) post(ctx context.Context, path string) error {
 	elapsed := time.Since(start)
 
 	if err != nil {
-		c.logger.Debug("request failed", "url", c.baseURL+path, "error", err, "duration", elapsed)
+		c.logger.Debug("request failed", "url", target, "error", err, "duration", elapsed)
 		return fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()

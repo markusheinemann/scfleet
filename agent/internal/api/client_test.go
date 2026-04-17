@@ -124,6 +124,30 @@ func TestClient_ErrorOnUnreachableURL(t *testing.T) {
 	}
 }
 
+func TestClient_HandlesTrailingSlashInBaseURL(t *testing.T) {
+	var gotPath string
+	client, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// Build a client with a trailing slash — should not produce double slashes.
+	clientWithSlash := api.New(srv.URL+"/", "test-token", srv.Client(), discardLogger)
+	_ = clientWithSlash.Register(context.Background())
+	_ = client // suppress unused warning
+
+	if gotPath != "/api/v1/register" {
+		t.Errorf("expected /api/v1/register, got %q (possible double slash)", gotPath)
+	}
+}
+
+func TestClient_BuildURLError(t *testing.T) {
+	client := api.New("%", "token", nil, discardLogger)
+	if err := client.Register(context.Background()); err == nil {
+		t.Fatal("expected error for invalid base URL, got nil")
+	}
+}
+
 func TestClient_DefaultHttpClient(t *testing.T) {
 	var called bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

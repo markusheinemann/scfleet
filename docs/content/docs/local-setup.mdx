@@ -1,0 +1,124 @@
+---
+title: Local Setup
+description: Run the full Scraper Fleet stack locally with Docker Compose
+---
+
+This guide walks you through running the full Scraper Fleet stack locally using Docker Compose. By the end you will have:
+
+- The **orchestrator** web UI running at `http://localhost:8080`
+- A **PostgreSQL** database
+- One **agent** instance pre-registered and sending heartbeats
+
+## Prerequisites
+
+| Tool | Minimum version |
+|------|----------------|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 4.x |
+| Docker Compose | v2 (bundled with Docker Desktop) |
+
+No other local dependencies are required — PHP, Go, and Node are all handled inside the containers.
+
+## Quick Start
+
+Clone the repository and start all services with a single command:
+
+```bash
+git clone https://github.com/markusheinemann/scfleet.git
+cd scfleet
+docker compose up --build
+```
+
+The first build takes a few minutes (Node assets, PHP dependencies, Go binary). Subsequent starts are fast.
+
+## What Happens on Startup
+
+1. **PostgreSQL** starts and passes its health check.
+2. **Orchestrator** runs database migrations and seeds initial data, then Apache starts.
+3. **Agent** waits for the orchestrator to be healthy, calls `/api/v1/register`, then sends a heartbeat every 30 seconds.
+
+## Accessing the Orchestrator
+
+Open **http://localhost:8080** in your browser.
+
+| Field    | Value               |
+|----------|---------------------|
+| Email    | `test@example.com`  |
+| Password | `password`          |
+
+The default user has the **Admin** role and can manage agents, users, and view heartbeat status.
+
+## Default Agent
+
+A default development agent is seeded automatically. You can see it in the orchestrator UI under **Agents**. It authenticates using the bearer token defined by `DEV_AGENT_TOKEN` in `docker-compose.yml` (default: `dev-agent-token`).
+
+## Configuration
+
+All service configuration is controlled through environment variables in `docker-compose.yml`.
+
+### Orchestrator
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_KEY` | pre-generated | Laravel application key |
+| `APP_URL` | `http://localhost:8080` | Public URL |
+| `DB_*` | see compose file | PostgreSQL connection |
+| `DEV_AGENT_TOKEN` | `dev-agent-token` | Plain-text token seeded for the default agent |
+
+### Agent
+
+| Variable / Flag | Default | Description |
+|-----------------|---------|-------------|
+| `--url` | `http://orchestrator` | Orchestrator base URL |
+| `--token` | `dev-agent-token` | Bearer token |
+| `--interval` | `30s` | Heartbeat interval |
+| `--debug` | off | Enable verbose HTTP logging |
+
+## Stopping
+
+```bash
+docker compose down
+```
+
+To also remove the database volume (full reset):
+
+```bash
+docker compose down -v
+```
+
+## Adding More Agents
+
+Scale the agent service to run multiple instances:
+
+```bash
+docker compose up --scale agent=3
+```
+
+Each instance uses the same token and registers independently. To use different tokens, create additional agents through the orchestrator UI and pass the new token with `--token`.
+
+## Troubleshooting
+
+<Callout type="info">
+  Run `docker compose logs <service>` to inspect logs for any service.
+</Callout>
+
+**Orchestrator shows a blank page or 500 error**
+
+Run `docker compose logs orchestrator` to check for migration errors. If the database volume has stale data from a previous schema, reset it:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+**Agent stays in "offline" state**
+
+The orchestrator marks an agent offline if it has not received a heartbeat within 120 seconds. Check agent logs with `docker compose logs agent`. If you see repeated `heartbeat failed` warnings, verify the orchestrator is reachable from inside the container network.
+
+**Port 8080 already in use**
+
+Change the host port mapping in `docker-compose.yml`:
+
+```yaml
+ports:
+  - "9090:80"
+```

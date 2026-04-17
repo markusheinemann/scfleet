@@ -16,10 +16,12 @@ import (
 )
 
 func main() {
-	os.Exit(run(os.Args[1:], os.Stderr))
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	os.Exit(run(ctx, os.Args[1:], os.Stderr))
 }
 
-func run(args []string, stderr io.Writer) int {
+func run(ctx context.Context, args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -48,9 +50,6 @@ func run(args []string, stderr io.Writer) int {
 
 	client := api.New(*url, *token, nil, logger)
 	agent := lifecycle.New(client, *interval, logger)
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	if err := agent.Run(ctx); err != nil {
 		logger.Error("agent stopped", "error", err)
