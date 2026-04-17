@@ -1,0 +1,64 @@
+openapi: 3.1.0
+
+info:
+  title: scfleet Orchestrator API
+  version: 1.0.0
+  description: API used by scraper agents to communicate with the orchestrator.
+
+servers:
+  - url: /api/v1
+
+security:
+  - agentToken: []
+
+tags:
+  - name: heartbeat
+
+paths:
+  /heartbeat:
+    post:
+      operationId: agentHeartbeat
+      summary: Agent heartbeat
+      description: >
+        Called by the agent every 10 seconds to signal liveness to the
+        orchestrator. The agent is identified solely by its bearer token; no
+        additional identification is required. The orchestrator records the
+        timestamp and responds immediately.
+      tags:
+        - heartbeat
+      responses:
+        "204":
+          description: Heartbeat recorded. No response body.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    agentToken:
+      type: http
+      scheme: bearer
+      description: >
+        Agent-scoped bearer token issued at registration time. Each request
+        must carry the token in the `Authorization: Bearer <token>` header.
+
+  schemas:
+    Error:
+      type: object
+      description: Standard error response returned on failed requests.
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Human-readable description of the error.
+          example: "Invalid or missing bearer token."
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            message: "Invalid or missing bearer token."
