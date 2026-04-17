@@ -27,7 +27,8 @@ RUN composer install --no-dev --no-scripts --no-interaction --no-progress
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
 
-RUN composer dump-autoload --optimize --no-interaction
+RUN php artisan package:discover --ansi \
+    && composer dump-autoload --optimize --no-interaction
 
 RUN chown -R www-data:www-data storage bootstrap/cache
 

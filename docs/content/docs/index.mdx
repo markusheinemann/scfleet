@@ -1,0 +1,30 @@
+---
+title: Introduction
+description: Overview of Scraper Fleet
+---
+
+Scraper Fleet is a distributed web scraping platform made up of two components:
+
+- **Orchestrator** — a Laravel web application that manages agents, users, and scraping tasks. It exposes a REST API that agents connect to.
+- **Agent** — a lightweight Go binary that registers itself with the orchestrator and sends periodic heartbeats to signal liveness.
+
+## Architecture
+
+```
+┌─────────────────────┐        HTTP (Bearer token)       ┌──────────────┐
+│    Orchestrator     │ ◄──────────────────────────────► │    Agent     │
+│  (Laravel + React)  │   POST /api/v1/register          │   (Go CLI)   │
+│                     │   POST /api/v1/heartbeat         │              │
+└─────────────────────┘                                  └──────────────┘
+          │
+          │
+    ┌─────▼──────┐
+    │ PostgreSQL  │
+    └────────────┘
+```
+
+Each agent authenticates using a unique bearer token that is created and managed through the orchestrator UI.
+
+## Getting Started
+
+Follow the [Local Setup](/docs/local-setup) guide to run the full stack on your machine using Docker Compose in under five minutes.

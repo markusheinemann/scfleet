@@ -35,6 +35,7 @@ services:
       LOG_CHANNEL: stderr
       LOG_LEVEL: debug
       DEV_AGENT_TOKEN: dev-agent-token
+      RUN_MIGRATIONS: "1"
     depends_on:
       db:
         condition: service_healthy

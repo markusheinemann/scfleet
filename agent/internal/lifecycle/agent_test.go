@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,86 +14,130 @@ import (
 var discardLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 type mockClient struct {
-	registerErr    error
-	heartbeatErr   error
-	registerCalls  atomic.Int32
-	heartbeatCalls atomic.Int32
+	registerErr  error
+	heartbeatErr error
+	registered   chan struct{}
+	heartbeated  chan struct{}
+}
+
+func newMock() *mockClient {
+	return &mockClient{
+		registered:  make(chan struct{}, 1),
+		heartbeated: make(chan struct{}, 100),
+	}
 }
 
 func (m *mockClient) Register(_ context.Context) error {
-	m.registerCalls.Add(1)
+	select {
+	case m.registered <- struct{}{}:
+	default:
+	}
 	return m.registerErr
 }
 
 func (m *mockClient) Heartbeat(_ context.Context) error {
-	m.heartbeatCalls.Add(1)
+	m.heartbeated <- struct{}{}
 	return m.heartbeatErr
 }
 
-func TestRun_CallsRegisterOnce(t *testing.T) {
-	mock := &mockClient{}
-	agent := lifecycle.New(mock, 10*time.Millisecond, discardLogger)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Millisecond)
-	defer cancel()
-
-	_ = agent.Run(ctx)
-
-	if mock.registerCalls.Load() != 1 {
-		t.Errorf("expected Register called once, got %d", mock.registerCalls.Load())
+// waitFor blocks until n signals arrive on ch or the test times out.
+func waitFor(t *testing.T, ch <-chan struct{}, n int) {
+	t.Helper()
+	for range n {
+		select {
+		case <-ch:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for signal %d/%d", n, n)
+		}
 	}
 }
 
-func TestRun_SendsImmediateHeartbeatAfterRegistration(t *testing.T) {
-	mock := &mockClient{}
+func TestRun_CallsRegisterOnce(t *testing.T) {
+	mock := newMock()
 	agent := lifecycle.New(mock, time.Hour, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- agent.Run(ctx) }()
 
-	// Give it a moment to register and send the immediate heartbeat, then cancel
-	// before any ticker fires.
-	time.Sleep(20 * time.Millisecond)
+	waitFor(t, mock.registered, 1)
+	// Wait for the immediate heartbeat before cancelling so we know
+	// the goroutine has progressed past Register.
+	waitFor(t, mock.heartbeated, 1)
 	cancel()
 	<-done
 
-	if mock.heartbeatCalls.Load() != 1 {
-		t.Errorf("expected 1 immediate heartbeat before first tick, got %d", mock.heartbeatCalls.Load())
+	// registered channel had capacity 1 and we drained it once — Register was called exactly once.
+	select {
+	case <-mock.registered:
+		t.Error("Register was called more than once")
+	default:
+	}
+}
+
+func TestRun_SendsImmediateHeartbeatAfterRegistration(t *testing.T) {
+	mock := newMock()
+	// Use a very long ticker interval so no tick fires during the test.
+	agent := lifecycle.New(mock, time.Hour, discardLogger)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- agent.Run(ctx) }()
+
+	// Wait for the immediate heartbeat, then cancel before any tick fires.
+	waitFor(t, mock.heartbeated, 1)
+	cancel()
+	<-done
+
+	// Drain any further heartbeats that might have raced in.
+	extra := 0
+	for {
+		select {
+		case <-mock.heartbeated:
+			extra++
+		default:
+			goto done
+		}
+	}
+done:
+	if extra > 0 {
+		t.Errorf("expected only the immediate heartbeat, but got %d extra", extra)
 	}
 }
 
 func TestRun_CallsHeartbeatOnTick(t *testing.T) {
-	mock := &mockClient{}
-	agent := lifecycle.New(mock, 10*time.Millisecond, discardLogger)
+	mock := newMock()
+	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Millisecond)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- agent.Run(ctx) }()
 
-	_ = agent.Run(ctx)
-
-	// 1 immediate + at least 2 from ticks
-	if mock.heartbeatCalls.Load() < 3 {
-		t.Errorf("expected at least 3 heartbeats (1 immediate + 2 ticks), got %d", mock.heartbeatCalls.Load())
-	}
+	// 1 immediate + 2 from ticks = 3 total
+	waitFor(t, mock.heartbeated, 3)
+	cancel()
+	<-done
 }
 
 func TestRun_ReturnsErrorWhenRegisterFails(t *testing.T) {
-	mock := &mockClient{registerErr: errors.New("unauthorized")}
-	agent := lifecycle.New(mock, 10*time.Millisecond, discardLogger)
+	mock := newMock()
+	mock.registerErr = errors.New("unauthorized")
+	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
 
 	err := agent.Run(context.Background())
 
 	if err == nil {
 		t.Fatal("expected error when register fails, got nil")
 	}
-	if mock.heartbeatCalls.Load() != 0 {
-		t.Errorf("expected no heartbeats after register failure, got %d", mock.heartbeatCalls.Load())
+	select {
+	case <-mock.heartbeated:
+		t.Error("expected no heartbeats after register failure")
+	default:
 	}
 }
 
 func TestRun_ExitsOnContextCancellation(t *testing.T) {
-	mock := &mockClient{}
+	mock := newMock()
 	agent := lifecycle.New(mock, time.Hour, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,6 +145,7 @@ func TestRun_ExitsOnContextCancellation(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- agent.Run(ctx) }()
 
+	waitFor(t, mock.heartbeated, 1)
 	cancel()
 
 	select {
@@ -109,24 +153,47 @@ func TestRun_ExitsOnContextCancellation(t *testing.T) {
 		if err != nil {
 			t.Errorf("expected nil on clean shutdown, got %v", err)
 		}
-	case <-time.After(time.Second):
+	case <-time.After(5 * time.Second):
 		t.Fatal("Run did not exit after context cancellation")
 	}
 }
 
 func TestRun_HeartbeatErrorDoesNotStop(t *testing.T) {
-	mock := &mockClient{heartbeatErr: errors.New("timeout")}
-	agent := lifecycle.New(mock, 10*time.Millisecond, discardLogger)
+	mock := newMock()
+	mock.heartbeatErr = errors.New("timeout")
+	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Millisecond)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- agent.Run(ctx) }()
 
-	err := agent.Run(ctx)
+	// Loop continues despite errors — wait for several heartbeats.
+	waitFor(t, mock.heartbeated, 3)
+	cancel()
 
-	if err != nil {
+	if err := <-done; err != nil {
 		t.Errorf("expected nil error (heartbeat errors are non-fatal), got %v", err)
 	}
-	if mock.heartbeatCalls.Load() < 2 {
-		t.Errorf("expected loop to continue despite heartbeat errors, got %d calls", mock.heartbeatCalls.Load())
+}
+
+func TestRun_ReturnsErrorOnZeroInterval(t *testing.T) {
+	mock := newMock()
+	agent := lifecycle.New(mock, 0, discardLogger)
+
+	err := agent.Run(context.Background())
+
+	if err == nil {
+		t.Fatal("expected error for zero interval, got nil")
+	}
+}
+
+func TestRun_ReturnsErrorOnNegativeInterval(t *testing.T) {
+	mock := newMock()
+	agent := lifecycle.New(mock, -time.Second, discardLogger)
+
+	err := agent.Run(context.Background())
+
+	if err == nil {
+		t.Fatal("expected error for negative interval, got nil")
 	}
 }

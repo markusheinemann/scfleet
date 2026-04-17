@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
 
         $plainToken = env('DEV_AGENT_TOKEN', 'dev-agent-token');
 
-        Agent::firstOrCreate(
+        Agent::updateOrCreate(
             ['name' => 'Default Dev Agent'],
             ['user_id' => $user->id, 'token' => hash('sha256', $plainToken)],
         );
