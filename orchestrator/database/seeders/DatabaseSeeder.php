@@ -2,24 +2,29 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Role;
+use App\Models\Agent;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $user = User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['username' => 'admin', 'password' => Hash::make('password'), 'role' => Role::Admin],
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $plainToken = env('DEV_AGENT_TOKEN', 'dev-agent-token');
+
+        Agent::firstOrCreate(
+            ['name' => 'Default Dev Agent'],
+            ['user_id' => $user->id, 'token' => hash('sha256', $plainToken)],
+        );
     }
 }
