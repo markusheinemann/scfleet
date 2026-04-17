@@ -13,13 +13,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DashboardLayout from '@/layouts/dashboard-layout';
 import { Link, router } from '@inertiajs/react';
-import { ArrowLeft, Copy, RefreshCw, Terminal, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Copy, RefreshCw, Terminal, TriangleAlert, Wifi, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 
 type Agent = {
   id: number;
   name: string;
+  is_online: boolean;
   last_heartbeat_at: string | null;
+  registered_at: string | null;
   created_at: string;
 };
 
@@ -63,10 +65,24 @@ export default function AgentsShow({ agent, token, canRegenerate }: Props) {
             <span className="sr-only">Back to agents</span>
           </Link>
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold">{agent.name}</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold">{agent.name}</h1>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+                agent.is_online
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {agent.is_online ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
+              {agent.is_online ? 'Online' : 'Offline'}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Registered {new Date(agent.created_at).toLocaleDateString()}
+            {agent.registered_at
+              ? `First connected ${new Date(agent.registered_at).toLocaleDateString()}`
+              : 'Not yet connected'}
           </p>
         </div>
       </div>

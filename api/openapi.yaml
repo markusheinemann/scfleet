@@ -12,18 +12,36 @@ security:
   - agentToken: []
 
 tags:
+  - name: lifecycle
   - name: heartbeat
 
 paths:
+  /register:
+    post:
+      operationId: agentRegister
+      summary: Agent registration
+      description: >
+        Called once by the agent on its first startup to signal that initial
+        setup is complete. The orchestrator records the timestamp of the first
+        connection. Subsequent calls are accepted but have no effect.
+      tags:
+        - lifecycle
+      responses:
+        "204":
+          description: Registration recorded. No response body.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /heartbeat:
     post:
       operationId: agentHeartbeat
       summary: Agent heartbeat
       description: >
-        Called by the agent every 10 seconds to signal liveness to the
-        orchestrator. The agent is identified solely by its bearer token; no
-        additional identification is required. The orchestrator records the
-        timestamp and responds immediately.
+        Called by the agent at the configured interval (default 30 seconds)
+        to signal liveness to the orchestrator. The agent is identified
+        solely by its bearer token; no additional identification is
+        required. The orchestrator records the timestamp and responds
+        immediately.
       tags:
         - heartbeat
       responses:
