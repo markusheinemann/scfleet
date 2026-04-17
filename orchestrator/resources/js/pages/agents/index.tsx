@@ -6,13 +6,30 @@ import { Bot, Plus } from 'lucide-react';
 type Agent = {
   id: number;
   name: string;
+  is_online: boolean;
   last_heartbeat_at: string | null;
+  registered_at: string | null;
   created_at: string;
 };
 
 type Props = {
   agents: Agent[];
 };
+
+function OnlineBadge({ online }: { online: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+        online
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-muted text-muted-foreground'
+      }`}
+    >
+      <span className={`size-1.5 rounded-full ${online ? 'bg-green-500' : 'bg-muted-foreground/50'}`} />
+      {online ? 'Online' : 'Offline'}
+    </span>
+  );
+}
 
 export default function AgentsIndex({ agents }: Props) {
   return (
@@ -50,6 +67,7 @@ export default function AgentsIndex({ agents }: Props) {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-3 text-left font-medium">Name</th>
+                <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Last Heartbeat</th>
                 <th className="px-4 py-3 text-left font-medium">Registered</th>
                 <th className="px-4 py-3" />
@@ -59,11 +77,18 @@ export default function AgentsIndex({ agents }: Props) {
               {agents.map(agent => (
                 <tr key={agent.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">{agent.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {agent.last_heartbeat_at ?? 'Never'}
+                  <td className="px-4 py-3">
+                    <OnlineBadge online={agent.is_online} />
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {new Date(agent.created_at).toLocaleDateString()}
+                    {agent.last_heartbeat_at
+                      ? new Date(agent.last_heartbeat_at).toLocaleString()
+                      : 'Never'}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {agent.registered_at
+                      ? new Date(agent.registered_at).toLocaleDateString()
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="sm" asChild>
