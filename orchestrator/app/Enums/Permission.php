@@ -9,4 +9,6 @@ enum Permission: string
     case ManageAgents = 'manage-agents';
     case ViewAgents = 'view-agents';
     case RegenerateAgentToken = 'regenerate-agent-token';
+    case ManageTargets = 'manage-targets';
+    case ViewTargets = 'view-targets';
 }

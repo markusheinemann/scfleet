@@ -14,7 +14,9 @@ services:
       - db-data:/var/lib/postgresql/data
 
   orchestrator:
-    build: ./orchestrator
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
     ports:
       - "8080:80"
     environment:

@@ -1,0 +1,222 @@
+---
+title: Extraction Schema
+description: Reference for the JSON schema that defines what data an agent extracts from a page
+---
+
+The extraction schema is a JSON document attached to every scraping target. It tells the agent which fields to extract from the rendered page, how to find them, and how to coerce the raw text into a typed value.
+
+## Top-level structure
+
+```json
+{
+  "version": "1",
+  "js_wait_selector": "[data-loaded]",
+  "page_timeout_s": 30,
+  "fields": [ ... ]
+}
+```
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `version` | `"1"` | ✓ | Schema version. Must be the string `"1"`. |
+| `fields` | array | ✓ | 1–100 field definitions. |
+| `js_wait_selector` | string | — | CSS selector the agent waits for before starting extraction. Useful for pages that lazy-load content. |
+| `page_timeout_s` | integer (5–120) | — | Hard timeout in seconds for the full page load. The agent default applies if omitted. |
+
+## Fields
+
+Each item in `fields` defines one key in the result JSON.
+
+```json
+{
+  "name": "price",
+  "type": "number",
+  "required": true,
+  "extractors": [ ... ],
+  "transform": { "regex": "([\\d.,]+)" }
+}
+```
+
+| Property | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | ✓ | Result key. Lowercase letters, digits, underscores. Must start with a letter or underscore. Max 64 chars. |
+| `type` | string | ✓ | Target type: `"string"`, `"number"`, `"boolean"`, or `"array"`. |
+| `item_type` | string | if `type` is `"array"` | Element type for array fields: `"string"`, `"number"`, or `"boolean"`. |
+| `required` | boolean | — | If `true`, the job fails when no extractor yields a value. Default: `false`. |
+| `extractors` | array | ✓ | 1–10 extractor strategies tried in order. First non-empty value wins. |
+| `transform` | object | — | Post-processing applied after extraction. |
+
+## Extractor strategies
+
+The agent tries each extractor in the `extractors` array in order and uses the first one that returns a non-empty value. Each extractor must have a `strategy` field that acts as its discriminator.
+
+### `css`
+
+Runs a CSS3 selector against the fully rendered DOM.
+
+```json
+{
+  "strategy": "css",
+  "selector": "h1.product-title",
+  "attribute": "innerText",
+  "multiple": false
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `selector` | ✓ | CSS selector expression (max 1000 chars). |
+| `attribute` | — | What to extract. `"innerText"` (default) for text, `"html"` for inner HTML, or any attribute name (`"href"`, `"src"`, `"content"`, …). |
+| `multiple` | — | Collect all matching elements into a list. Use with `type: "array"` fields. Default: `false`. |
+
+### `xpath`
+
+Evaluates an XPath 1.0 expression against the DOM.
+
+```json
+{
+  "strategy": "xpath",
+  "selector": "//span[@itemprop='price']/@content",
+  "attribute": "innerText",
+  "multiple": false
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `selector` | ✓ | XPath 1.0 expression (max 1000 chars). |
+| `attribute` | — | Same semantics as the CSS extractor. Ignored when the XPath selects an attribute or text node directly. |
+| `multiple` | — | Collect all matched nodes. Default: `false`. |
+
+### `schema_org`
+
+Finds a JSON-LD block whose `@type` matches, then traverses a dot-notation path into it.
+
+```json
+{
+  "strategy": "schema_org",
+  "schema_type": "Product",
+  "path": "aggregateRating.ratingValue"
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `schema_type` | ✓ | Schema.org type to match (case-insensitive). Examples: `"Product"`, `"Offer"`, `"AggregateRating"`, `"Article"`. |
+| `path` | ✓ | Dot-notation path into the matched object. Array indexing via numeric keys: `"images.0"`. |
+
+### `microdata`
+
+Queries elements with a matching `itemprop=` attribute per the HTML Microdata specification.
+
+```json
+{
+  "strategy": "microdata",
+  "itemprop": "ratingValue",
+  "attribute": "content",
+  "multiple": false
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `itemprop` | ✓ | Value of the `itemprop=` attribute to match. |
+| `attribute` | — | HTML attribute to extract. Defaults to `"content"` for `<meta>` elements, `"innerText"` for all others. |
+| `multiple` | — | Collect all matching elements. Default: `false`. |
+
+### `meta`
+
+Extracts the `content=` value from a `<meta>` tag by `property=` or `name=` attribute.
+
+```json
+{
+  "strategy": "meta",
+  "property": "og:title"
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `property` | ✓ | Matches `property=` first, then `name=` (case-insensitive). Examples: `"og:title"`, `"og:image"`, `"twitter:card"`, `"description"`. |
+
+### `json_ld`
+
+Raw access to a JSON-LD block without `@type` matching. Use `schema_org` when the type is a known Schema.org type.
+
+```json
+{
+  "strategy": "json_ld",
+  "path": "mainEntity.offers.0.price",
+  "block_index": 0
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `path` | ✓ | Dot-notation path from the root of the JSON-LD block. |
+| `block_index` | — | Zero-based index when a page has multiple `<script type="application/ld+json">` blocks. Default: `0`. |
+
+## Transform
+
+Optional post-processing applied to the raw extracted string before type coercion.
+
+```json
+{
+  "trim": true,
+  "regex": "([\\d.,]+)",
+  "prepend": "https://example.com",
+  "append": " USD"
+}
+```
+
+| Property | Description |
+|---|---|
+| `trim` | Strip leading/trailing whitespace. Default: `true`. |
+| `regex` | Regular expression. If a capture group is present, its content is used; otherwise the full match. Extraction fails if the pattern does not match. |
+| `prepend` | String prepended after trim and regex. Useful for constructing absolute URLs. |
+| `append` | String appended after trim and regex. |
+
+## Complete example
+
+```json
+{
+  "version": "1",
+  "js_wait_selector": "[data-product-loaded]",
+  "fields": [
+    {
+      "name": "title",
+      "type": "string",
+      "required": true,
+      "extractors": [
+        { "strategy": "schema_org", "schema_type": "Product", "path": "name" },
+        { "strategy": "css", "selector": "h1.product-title" },
+        { "strategy": "meta", "property": "og:title" }
+      ],
+      "transform": { "trim": true }
+    },
+    {
+      "name": "price",
+      "type": "number",
+      "required": false,
+      "extractors": [
+        { "strategy": "schema_org", "schema_type": "Offer", "path": "price" },
+        { "strategy": "microdata", "itemprop": "price", "attribute": "content" },
+        { "strategy": "css", "selector": ".price-now" }
+      ],
+      "transform": { "regex": "([\\d.,]+)" }
+    },
+    {
+      "name": "images",
+      "type": "array",
+      "item_type": "string",
+      "extractors": [
+        { "strategy": "css", "selector": ".gallery img", "attribute": "src", "multiple": true }
+      ]
+    }
+  ]
+}
+```
+
+<Callout type="info">
+  The extraction schema is validated against a JSON Schema (draft 2020-12) when a target is created. The Monaco editor in the creation form provides autocompletion and inline error highlighting based on the same schema.
+</Callout>

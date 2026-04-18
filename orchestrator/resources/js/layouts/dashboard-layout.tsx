@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/sidebar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Link, usePage } from '@inertiajs/react';
-import { Bot, ChevronsUpDown, LayoutDashboard, LogOut } from 'lucide-react';
+import { Bot, ChevronsUpDown, LayoutDashboard, LogOut, Target } from 'lucide-react';
 
 type SharedProps = {
   auth: {
@@ -40,6 +40,7 @@ type SharedProps = {
 const navItems = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   { title: 'Agents', href: '/agents', icon: Bot },
+  { title: 'Targets', href: '/targets', icon: Target },
 ];
 
 function AppSidebar() {
