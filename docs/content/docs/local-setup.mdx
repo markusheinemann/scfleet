@@ -73,6 +73,34 @@ All service configuration is controlled through environment variables in `docker
 | `--interval` | `30s` | Heartbeat interval |
 | `--debug` | off | Enable verbose HTTP logging |
 
+## Frontend Development (HMR)
+
+For a faster frontend workflow, a `docker-compose.override.yml` file is included that adds a `vite` service running `npm run dev` inside a Node container. It mounts the `orchestrator/` directory directly, so any change to a TypeScript, CSS, or React file is reflected in the browser instantly via Hot Module Replacement — no image rebuild required.
+
+The override file is picked up automatically by Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Vite is now available at **http://localhost:5173** and the orchestrator automatically routes asset requests through it.
+
+To start only the Vite service while the rest of the stack is already running:
+
+```bash
+docker compose up vite
+```
+
+To stop Vite without tearing down the rest of the stack:
+
+```bash
+docker compose stop vite
+```
+
+<Callout type="info">
+  When the `vite` service starts it writes a `public/hot` marker file into the shared volume. Laravel's Vite helper detects that file and automatically serves assets from the live dev server instead of the pre-built `public/build` assets.
+</Callout>
+
 ## Stopping
 
 ```bash

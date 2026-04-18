@@ -1,0 +1,70 @@
+{
+  "$error": {
+    "required": {
+      "version": "Missing required \"version\" property. Add: \"version\": \"1\".",
+      "fields": "Missing required \"fields\" array with at least one field definition."
+    },
+    "additionalProperties": "Unknown top-level property. Allowed: version, fields, js_wait_selector, page_timeout_s."
+  },
+  "properties": {
+    "version": {
+      "$error": {
+        "const": "Schema version must be the string \"1\".",
+        "type": "Schema version must be the string \"1\"."
+      }
+    },
+    "fields": {
+      "$error": {
+        "type": "\"fields\" must be a JSON array.",
+        "minItems": "\"fields\" must contain at least one field definition.",
+        "maxItems": "\"fields\" can contain at most 100 field definitions."
+      }
+    }
+  },
+  "$defs": {
+    "field": {
+      "$error": {
+        "type": "Each field entry must be a JSON object.",
+        "required": {
+          "name": "Field is missing the required \"name\" property.",
+          "type": "Field is missing the required \"type\" property (one of: string, number, boolean, array).",
+          "extractors": "Field is missing the required \"extractors\" array.",
+          "*": "Field is missing a required property."
+        },
+        "additionalProperties": "Field contains an unknown property. Allowed: name, type, item_type, required, extractors, transform."
+      },
+      "properties": {
+        "name": {
+          "$error": {
+            "pattern": "Field name must use only lowercase letters, digits, and underscores, starting with a letter or underscore (e.g. \"title\", \"review_count\").",
+            "maxLength": "Field name must be at most 64 characters.",
+            "type": "Field name must be a string."
+          }
+        },
+        "type": {
+          "$error": {
+            "enum": "Field type must be one of: string, number, boolean, array.",
+            "type": "Field type must be a string."
+          }
+        },
+        "extractors": {
+          "$error": {
+            "type": "\"extractors\" must be a JSON array.",
+            "minItems": "\"extractors\" must contain at least one extractor.",
+            "maxItems": "\"extractors\" can contain at most 10 extractors."
+          }
+        }
+      }
+    },
+    "extractor": {
+      "$error": {
+        "type": "Each extractor must be a JSON object (e.g. {\"strategy\": \"css\", \"selector\": \"h1\"}).",
+        "required": {
+          "strategy": "Extractor is missing the required \"strategy\" property. Use one of: css, xpath, schema_org, microdata, meta, json_ld.",
+          "*": "Extractor is missing a required property."
+        },
+        "oneOf": "Extractor is not valid for this strategy. Check that all required properties are present (css/xpath need \"selector\"; schema_org needs \"schema_type\" and \"path\"; microdata needs \"itemprop\"; meta needs \"property\"; json_ld needs \"path\")."
+      }
+    }
+  }
+}

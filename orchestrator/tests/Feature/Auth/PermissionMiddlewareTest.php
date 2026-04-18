@@ -121,14 +121,21 @@ describe('role permissions mapping', function (): void {
             Permission::ManageAgents,
             Permission::ViewAgents,
             Permission::RegenerateAgentToken,
+            Permission::ManageTargets,
+            Permission::ViewTargets,
         ]);
     });
 
-    it('editor has agent permissions', function (): void {
-        expect(Role::Editor->permissions())->toBe([Permission::ManageAgents, Permission::ViewAgents]);
+    it('editor has agent and target permissions', function (): void {
+        expect(Role::Editor->permissions())->toBe([
+            Permission::ManageAgents,
+            Permission::ViewAgents,
+            Permission::ManageTargets,
+            Permission::ViewTargets,
+        ]);
     });
 
-    it('viewer can only view agents', function (): void {
-        expect(Role::Viewer->permissions())->toBe([Permission::ViewAgents]);
+    it('viewer can only view agents and targets', function (): void {
+        expect(Role::Viewer->permissions())->toBe([Permission::ViewAgents, Permission::ViewTargets]);
     });
 });

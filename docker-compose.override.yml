@@ -1,0 +1,31 @@
+services:
+  vite:
+    image: node:24-alpine
+    working_dir: /app
+    command: >
+      sh -c "trap 'rm -f /app/public/hot' EXIT INT TERM;
+             touch /app/public/hot &&
+             npm install &&
+             npm run dev -- --host"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./orchestrator:/app
+      - vite_node_modules:/app/node_modules
+    environment:
+      # Written into public/hot so Laravel and the browser use the correct host.
+      # Uses server.hmr.host (not server.origin) to avoid breaking Vite's CORS.
+      VITE_HMR_HOST: localhost
+      VITE_USE_POLLING: "true"
+
+  orchestrator:
+    depends_on:
+      - vite
+    volumes:
+      # Shares only the Vite hot file so Laravel knows to proxy assets through
+      # the dev server. Mounting just this file (not all of public/) preserves
+      # the pre-built public/build assets baked into the image.
+      - ./orchestrator/public/hot:/var/www/html/public/hot
+
+volumes:
+  vite_node_modules:

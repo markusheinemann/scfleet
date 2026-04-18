@@ -25,7 +25,9 @@ function OnlineBadge({ online }: { online: boolean }) {
           : 'bg-muted text-muted-foreground'
       }`}
     >
-      <span className={`size-1.5 rounded-full ${online ? 'bg-green-500' : 'bg-muted-foreground/50'}`} />
+      <span
+        className={`size-1.5 rounded-full ${online ? 'bg-green-500' : 'bg-muted-foreground/50'}`}
+      />
       {online ? 'Online' : 'Offline'}
     </span>
   );
@@ -86,9 +88,7 @@ export default function AgentsIndex({ agents }: Props) {
                       : 'Never'}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {agent.registered_at
-                      ? new Date(agent.registered_at).toLocaleDateString()
-                      : '—'}
+                    {agent.registered_at ? new Date(agent.registered_at).toLocaleDateString() : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button variant="ghost" size="sm" asChild>

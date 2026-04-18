@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/markusheinemann/scfleet/api/schemas/template.v1.json",
+  "title": "scfleet Extraction Template Definition",
+  "description": "Defines a set of typed, named fields to extract from a rendered web page. Each field carries an ordered list of extractor strategies; the first to yield a non-empty value wins.",
+  "type": "object",
+  "required": ["version", "fields"],
+  "additionalProperties": false,
+
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1",
+      "description": "Schema version. Must be '1' for this schema. Increment when breaking changes are introduced."
+    },
+
+    "js_wait_selector": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Optional CSS selector. The agent waits for a matching element to appear in the DOM before beginning extraction. Useful for pages that lazy-load their structured data or render content asynchronously. If omitted, extraction begins immediately after the initial page load."
+    },
+
+    "page_timeout_s": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 120,
+      "description": "Hard timeout in seconds for the full page fetch, including any js_wait_selector wait. If omitted, the agent default applies."
+    },
+
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "description": "Ordered list of fields to extract. Each field produces one key in the result JSON object. Field names must be unique within this array.",
+      "items": { "$ref": "#/$defs/field" }
+    }
+  },
+
+  "$defs": {
+    "field": {
+      "type": "object",
+      "required": ["name", "type", "extractors"],
+      "additionalProperties": false,
+      "description": "A single named, typed field to extract from the page.",
+
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Key used in the result JSON object. Must be lowercase letters, digits, and underscores, starting with a letter or underscore. Examples: title, price, review_count, is_in_stock."
+        },
+
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "array"],
+          "description": "Target type after coercion. 'string': trimmed text. 'number': parsed as float64 after optional regex. 'boolean': 'true'/'1'/'yes' → true; 'false'/'0'/'no' → false. 'array': all matches collected into a JSON array; item_type must be set."
+        },
+
+        "item_type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean"],
+          "description": "Element type for array fields. Required when type is 'array'. Each matched element is independently coerced to this type; empty elements are dropped."
+        },
+
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, the job is marked as failed with error_type 'missing_required_field' when no extractor yields a value for this field. If false (default), a missing field is recorded in field_errors but the job still succeeds."
+        },
+
+        "extractors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "description": "Ordered list of extractor strategies. The agent tries each in sequence and returns the first non-empty value. Subsequent extractors act as fallbacks.",
+          "items": { "$ref": "#/$defs/extractor" }
+        },
+
+        "transform": {
+          "$ref": "#/$defs/transform"
+        }
+      },
+
+      "if": {
+        "properties": { "type": { "const": "array" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["item_type"],
+        "description": "item_type is required when type is 'array'."
+      }
+    },
+
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional post-processing applied to the raw extracted string before type coercion.",
+      "properties": {
+        "trim": {
+          "type": "boolean",
+          "default": true,
+          "description": "Strip leading and trailing whitespace from the extracted value. Defaults to true."
+        },
+
+        "regex": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Regular expression applied to the extracted string. If the expression contains a capture group, the content of the first capture group is used as the value. If there is no capture group, the full match is used. Extraction fails if the pattern does not match. Example: '([\\d.,]+)' extracts the first numeric string from text like 'Price: €279.99'."
+        },
+
+        "prepend": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "String to prepend to the extracted value after trim and regex are applied. Useful for constructing absolute URLs from relative paths."
+        },
+
+        "append": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "String to append to the extracted value after trim and regex are applied."
+        }
+      }
+    },
+
+    "extractor": {
+      "type": "object",
+      "required": ["strategy"],
+      "description": "A single extraction strategy. The strategy property acts as a discriminator that determines which other properties are required.",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "css",
+            "xpath",
+            "schema_org",
+            "microdata",
+            "meta",
+            "json_ld"
+          ],
+          "description": "The extraction mechanism to use. Determines which other properties are required."
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/$defs/extractor_css" },
+        { "$ref": "#/$defs/extractor_xpath" },
+        { "$ref": "#/$defs/extractor_schema_org" },
+        { "$ref": "#/$defs/extractor_microdata" },
+        { "$ref": "#/$defs/extractor_meta" },
+        { "$ref": "#/$defs/extractor_json_ld" }
+      ]
+    },
+
+    "extractor_css": {
+      "description": "Runs a CSS selector against the fully rendered DOM. Uses the goquery library (CSS3 selectors supported). Set multiple: true on array fields to collect all matches.",
+      "type": "object",
+      "required": ["strategy", "selector"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "css" },
+        "selector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "CSS selector expression. Evaluated against the fully rendered DOM after JavaScript execution. Examples: 'h1.product-title', '[itemprop=\"ratingValue\"]', '.price > span:first-child'."
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "default": "innerText",
+          "description": "What to extract from matched elements. 'innerText' returns visible text content (default). 'html' returns the inner HTML. Any other value is treated as an HTML attribute name, e.g. 'href', 'src', 'content', 'data-price'."
+        },
+        "multiple": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, all matching elements are collected and returned as a list. Should only be set on array-type fields. If false (default), only the first matching element is used."
+        }
+      }
+    },
+
+    "extractor_xpath": {
+      "description": "Evaluates an XPath 1.0 expression against the parsed DOM. Uses antchfx/htmlquery. More expressive than CSS for text node selection, sibling traversal, and attribute predicates.",
+      "type": "object",
+      "required": ["strategy", "selector"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "xpath" },
+        "selector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "XPath 1.0 expression. Examples: '//h1[@class=\"title\"]/text()', '//span[@itemprop=\"price\"]/@content', '//meta[@property=\"og:title\"]/@content'."
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "default": "innerText",
+          "description": "Same semantics as the css extractor attribute property. If the XPath expression itself selects an attribute node or text node, this property is ignored and the node value is used directly."
+        },
+        "multiple": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, all matched nodes are collected and returned as a list. Should only be set on array-type fields."
+        }
+      }
+    },
+
+    "extractor_schema_org": {
+      "description": "Parses all <script type='application/ld+json'> blocks in the page. Finds the first object whose @type matches schema_type, then traverses a dot-notation path into that object. Handles @graph containers and @type arrays automatically. Uses gjson for zero-allocation path traversal.",
+      "type": "object",
+      "required": ["strategy", "schema_type", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "schema_org" },
+        "schema_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Schema.org type name to match against the @type property of JSON-LD objects. Matching is case-insensitive. Handles both scalar (@type: 'Product') and array (@type: ['Product', 'Thing']) values. Examples: 'Product', 'AggregateRating', 'Offer', 'Article', 'JobPosting', 'Event', 'BreadcrumbList'."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[a-zA-Z@][a-zA-Z0-9_.@\\[\\]]*$",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Dot-notation path into the matched Schema.org object using gjson syntax. Examples: 'name', 'price', 'ratingValue', 'aggregateRating.ratingValue', 'author.name', 'offers.0.price'. Array indexing uses numeric keys: 'images.0'."
+        }
+      }
+    },
+
+    "extractor_microdata": {
+      "description": "Queries elements with a matching itemprop= attribute per the HTML Microdata specification (https://html.spec.whatwg.org/multipage/microdata.html). Useful for sites using the older itemscope/itemprop markup pattern rather than JSON-LD.",
+      "type": "object",
+      "required": ["strategy", "itemprop"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "microdata" },
+        "itemprop": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Value of the itemprop= attribute to match. For <meta itemprop='...'> and <link itemprop='...'> elements the content= or href= attribute is returned. For all other elements, innerText is returned unless overridden by attribute. Examples: 'price', 'ratingValue', 'reviewCount', 'name', 'availability'."
+        },
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "HTML attribute to extract from the matched element. Defaults to 'content' for <meta> elements and 'innerText' for all others. Set explicitly to override: e.g. 'content' to always extract the content= attribute regardless of element type."
+        },
+        "multiple": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, all elements with the matching itemprop are collected. Should only be set on array-type fields."
+        }
+      }
+    },
+
+    "extractor_meta": {
+      "description": "Extracts the content= value from a <meta> tag matching a property= or name= attribute. Covers Open Graph (og:*), Twitter card (twitter:*), standard HTML meta tags, and any custom meta tags.",
+      "type": "object",
+      "required": ["strategy", "property"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "meta" },
+        "property": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Value to match against the meta tag's property= attribute first, then name= attribute if no property match is found. Matching is case-insensitive. Examples: 'og:title', 'og:description', 'og:image', 'twitter:card', 'description', 'author', 'keywords'."
+        }
+      }
+    },
+
+    "extractor_json_ld": {
+      "description": "Raw access to a JSON-LD block without Schema.org @type matching. Applies a gjson dot-notation path to the first JSON-LD block found in the page. Use schema_org instead when the target type is a known Schema.org type — json_ld is for non-standard vocabularies or when @type matching is not needed.",
+      "type": "object",
+      "required": ["strategy", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "strategy": { "type": "string", "const": "json_ld" },
+        "block_index": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Zero-based index of the JSON-LD block to use when a page contains multiple <script type='application/ld+json'> elements. Defaults to 0 (the first block found)."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[a-zA-Z@][a-zA-Z0-9_.@\\[\\]]*$",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Dot-notation gjson path into the raw JSON-LD object. The path is evaluated from the root of the selected block, not from a type-matched sub-object. Examples: '@graph.0.name', 'mainEntity.offers.0.price', '@context'."
+        }
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "version": "1",
+      "js_wait_selector": "[data-product-loaded]",
+      "fields": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "extractors": [
+            {
+              "strategy": "schema_org",
+              "schema_type": "Product",
+              "path": "name"
+            },
+            {
+              "strategy": "css",
+              "selector": "h1.product-title",
+              "attribute": "innerText"
+            },
+            { "strategy": "meta", "property": "og:title" }
+          ],
+          "transform": { "trim": true }
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": false,
+          "extractors": [
+            {
+              "strategy": "schema_org",
+              "schema_type": "Offer",
+              "path": "price"
+            },
+            {
+              "strategy": "microdata",
+              "itemprop": "price",
+              "attribute": "content"
+            },
+            {
+              "strategy": "css",
+              "selector": ".price-now",
+              "attribute": "innerText"
+            }
+          ],
+          "transform": { "regex": "([\\d.,]+)" }
+        },
+        {
+          "name": "rating",
+          "type": "number",
+          "required": false,
+          "extractors": [
+            {
+              "strategy": "schema_org",
+              "schema_type": "AggregateRating",
+              "path": "ratingValue"
+            },
+            {
+              "strategy": "microdata",
+              "itemprop": "ratingValue",
+              "attribute": "content"
+            }
+          ]
+        },
+        {
+          "name": "images",
+          "type": "array",
+          "item_type": "string",
+          "required": false,
+          "extractors": [
+            {
+              "strategy": "schema_org",
+              "schema_type": "Product",
+              "path": "image"
+            },
+            {
+              "strategy": "css",
+              "selector": ".gallery img",
+              "attribute": "src",
+              "multiple": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
