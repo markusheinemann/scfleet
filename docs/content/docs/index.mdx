@@ -8,12 +8,12 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Steps, Step } from 'fumadocs-ui/components/steps';
 import { Mermaid } from '@/components/mermaid';
 
-Scraper Fleet is a self-hosted platform for running web scraping jobs at scale. You define **extraction templates** that describe exactly what data to pull from a page — field names, types, and how to find each value — and a fleet of **agents** powered by headless Chrome executes those jobs in parallel and returns clean, structured JSON.
+Scraper Fleet is a self-hosted platform for running web scraping jobs at scale. You define **extraction templates** (field names, types, and how to find each value) and a fleet of **agents** powered by headless Chrome executes those jobs in parallel and returns clean, structured JSON.
 
 The system is built around two components that communicate over a REST API:
 
-- **Orchestrator** — a Laravel web application that manages users, agents, templates, and the full job lifecycle. It also exposes the external API that your applications call to submit jobs and retrieve results.
-- **Agent** — a lightweight Go binary. Each agent registers itself with the orchestrator, picks up pending jobs, renders the target URL in a real browser, extracts data using up to six strategies per field, and ships the result back — including a screenshot and raw HTML snapshot for debugging.
+- **Orchestrator**: a Laravel web application that manages users, agents, templates, and the full job lifecycle. It also exposes the external API that your applications call to submit jobs and retrieve results.
+- **Agent**: a lightweight Go binary. Each agent registers itself with the orchestrator, picks up pending jobs, renders the target URL in a real browser, extracts data using up to six strategies per field, and ships the result back, including a screenshot and raw HTML snapshot for debugging.
 
 You scale throughput by running more agents. Each one connects independently and starts processing jobs immediately.
 
@@ -21,9 +21,9 @@ You scale throughput by running more agents. Each one connects independently and
 
 ## The Big Picture
 
-Most scraping tools are point solutions: a script, a cron job, a browser extension. They work fine until you need to scrape hundreds of URLs a day, handle JavaScript-rendered pages reliably, or share extraction logic across projects. At that point, operational complexity takes over — you're managing infrastructure, retries, scheduling, and results storage yourself.
+Most scraping tools are point solutions: a script, a cron job, a browser extension. They work fine until you need to scrape hundreds of URLs a day, handle JavaScript-rendered pages reliably, or share extraction logic across projects. At that point, operational complexity takes over and you end up managing infrastructure, retries, scheduling, and results storage yourself.
 
-Scraper Fleet separates the *what* from the *how*. Templates describe the shape of the data you want. The infrastructure — browser fleet, job queue, retry logic, artifact storage — is handled by the platform. Your application only needs to call an API.
+Scraper Fleet separates the *what* from the *how*. Templates describe the shape of the data you want. The platform handles the rest: browser fleet, job queue, retry logic, and artifact storage. Your application only needs to call an API.
 
 <Mermaid chart={`
 sequenceDiagram
@@ -109,7 +109,7 @@ It is not designed for crawling entire sites or following links automatically. E
   <Step>
     **Create an API key**
 
-    Go to **API Keys → New key**. Copy the key — it is only shown once.
+    Go to **API Keys → New key**. Copy the key now, it is only shown once.
   </Step>
 
   <Step>

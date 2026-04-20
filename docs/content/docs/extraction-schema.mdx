@@ -3,6 +3,8 @@ title: Extraction Schema
 description: Reference for the JSON schema that defines what data an agent extracts from a page
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+
 The extraction schema is a JSON document attached to every scraping target. It tells the agent which fields to extract from the rendered page, how to find them, and how to coerce the raw text into a typed value.
 
 ## Top-level structure
@@ -20,8 +22,8 @@ The extraction schema is a JSON document attached to every scraping target. It t
 |---|---|---|---|
 | `version` | `"1"` | ✓ | Schema version. Must be the string `"1"`. |
 | `fields` | array | ✓ | 1–100 field definitions. |
-| `js_wait_selector` | string | — | CSS selector the agent waits for before starting extraction. Useful for pages that lazy-load content. |
-| `page_timeout_s` | integer (5–120) | — | Hard timeout in seconds for the full page load. The agent default applies if omitted. |
+| `js_wait_selector` | string (max 500 chars) | — | CSS selector the agent waits for before starting extraction. Useful for pages that lazy-load content after the initial render. |
+| `page_timeout_s` | integer (5–120) | — | Hard timeout in seconds for the full page load, including the `js_wait_selector` wait. Defaults to 30 seconds if omitted. |
 
 ## Fields
 
@@ -66,8 +68,8 @@ Runs a CSS3 selector against the fully rendered DOM.
 | Property | Required | Description |
 |---|---|---|
 | `selector` | ✓ | CSS selector expression (max 1000 chars). |
-| `attribute` | — | What to extract. `"innerText"` (default) for text, `"html"` for inner HTML, or any attribute name (`"href"`, `"src"`, `"content"`, …). |
-| `multiple` | — | Collect all matching elements into a list. Use with `type: "array"` fields. Default: `false`. |
+| `attribute` | — | What to extract from the matched element. `"innerText"` (default) returns the visible text content. `"html"` returns the inner HTML. Any other value is treated as an HTML attribute name, e.g. `"href"`, `"src"`, `"content"`, `"data-price"`. |
+| `multiple` | — | Collect all matching elements into a list. Pair with `type: "array"` fields. Default: `false`. |
 
 ### `xpath`
 
@@ -85,7 +87,7 @@ Evaluates an XPath 1.0 expression against the DOM.
 | Property | Required | Description |
 |---|---|---|
 | `selector` | ✓ | XPath 1.0 expression (max 1000 chars). |
-| `attribute` | — | Same semantics as the CSS extractor. Ignored when the XPath selects an attribute or text node directly. |
+| `attribute` | — | Same semantics as the CSS `attribute` property. Ignored when the XPath expression itself selects an attribute node (e.g. `/@content`) or text node (e.g. `/text()`), since the node value is used directly. |
 | `multiple` | — | Collect all matched nodes. Default: `false`. |
 
 ### `schema_org`
@@ -100,7 +102,9 @@ Finds a JSON-LD block whose `@type` matches, then traverses a dot-notation path 
 }
 ```
 
-When you don't know the `@type` in advance, use `"*"` to search all JSON-LD blocks and return the first block that contains the given path:
+Matching is case-insensitive and handles both scalar (`"@type": "Product"`) and array (`"@type": ["Product", "Thing"]`) type values. Pages that wrap their JSON-LD in a `@graph` container are also supported: the agent searches each item in the graph.
+
+When you don't know the `@type` in advance, use `"*"` to search all JSON-LD blocks and return the first match that contains the given path:
 
 ```json
 {
@@ -112,7 +116,7 @@ When you don't know the `@type` in advance, use `"*"` to search all JSON-LD bloc
 
 | Property | Required | Description |
 |---|---|---|
-| `schema_type` | ✓ | Schema.org type to match (case-insensitive). Examples: `"Product"`, `"Offer"`, `"AggregateRating"`, `"Article"`. Use `"*"` to match any type — useful when the type varies by page (e.g. `"Hotel"`, `"VacationRental"`, `"LodgingBusiness"` on accommodation sites). |
+| `schema_type` | ✓ | Schema.org type to match. Case-insensitive. Examples: `"Product"`, `"Offer"`, `"AggregateRating"`, `"Article"`. Use `"*"` to match any type. |
 | `path` | ✓ | Dot-notation path into the matched object. Array indexing via numeric keys: `"images.0"`. |
 
 ### `microdata`
@@ -128,10 +132,17 @@ Queries elements with a matching `itemprop=` attribute per the HTML Microdata sp
 }
 ```
 
+The default extraction behavior depends on the element type:
+- `<meta itemprop="...">`: returns the `content=` attribute
+- `<link itemprop="...">`: returns the `href=` attribute
+- All other elements: returns `innerText`
+
+Set `attribute` explicitly to override this default for any element type.
+
 | Property | Required | Description |
 |---|---|---|
 | `itemprop` | ✓ | Value of the `itemprop=` attribute to match. |
-| `attribute` | — | HTML attribute to extract. Defaults to `"content"` for `<meta>` elements, `"innerText"` for all others. |
+| `attribute` | — | HTML attribute to extract. Overrides the default element-based behavior described above. |
 | `multiple` | — | Collect all matching elements. Default: `false`. |
 
 ### `meta`
@@ -163,12 +174,12 @@ Raw access to a JSON-LD block without `@type` matching. Use `schema_org` when th
 
 | Property | Required | Description |
 |---|---|---|
-| `path` | ✓ | Dot-notation path from the root of the JSON-LD block. |
-| `block_index` | — | Zero-based index when a page has multiple `<script type="application/ld+json">` blocks. Default: `0`. |
+| `path` | ✓ | Dot-notation path from the root of the JSON-LD block. Examples: `"@graph.0.name"`, `"mainEntity.offers.0.price"`. |
+| `block_index` | — | Zero-based index selecting which `<script type="application/ld+json">` block to read when a page has multiple. Default: `0`. |
 
 ## Transform
 
-Optional post-processing applied to the raw extracted string before type coercion.
+Optional post-processing applied to the extracted string before type coercion. Steps are applied in this order: **trim → regex → prepend → append**.
 
 ```json
 {
@@ -181,10 +192,10 @@ Optional post-processing applied to the raw extracted string before type coercio
 
 | Property | Description |
 |---|---|
-| `trim` | Strip leading/trailing whitespace. Default: `true`. |
-| `regex` | Regular expression. If a capture group is present, its content is used; otherwise the full match. Extraction fails if the pattern does not match. |
-| `prepend` | String prepended after trim and regex. Useful for constructing absolute URLs. |
-| `append` | String appended after trim and regex. |
+| `trim` | Strip leading/trailing whitespace. Default: `true`. Applied first. |
+| `regex` | Regular expression. If the pattern contains a capture group, the content of the **first** capture group is used. If there is no capture group, the full match is used. Extraction fails if the pattern does not match. |
+| `prepend` | String prepended to the value after trim and regex. Useful for constructing absolute URLs from relative paths. |
+| `append` | String appended to the value after trim and regex. |
 
 ## Complete example
 
@@ -228,5 +239,5 @@ Optional post-processing applied to the raw extracted string before type coercio
 ```
 
 <Callout type="info">
-  The extraction schema is validated against a JSON Schema (draft 2020-12) when a target is created. The Monaco editor in the creation form provides autocompletion and inline error highlighting based on the same schema.
+  The extraction schema is validated against a JSON Schema (draft 2020-12) when a template is created or updated. The Monaco editor in the orchestrator UI provides autocompletion and inline error highlighting based on the same schema.
 </Callout>
