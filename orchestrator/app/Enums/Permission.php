@@ -11,4 +11,5 @@ enum Permission: string
     case RegenerateAgentToken = 'regenerate-agent-token';
     case ManageTemplates = 'manage-templates';
     case ViewTemplates = 'view-templates';
+    case ManageApiKeys = 'manage-api-keys';
 }

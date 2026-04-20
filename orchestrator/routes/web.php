@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\ScrapeJobArtifactController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\TemplateController;
@@ -31,6 +32,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('templates/{template}/edit', [TemplateController::class, 'edit'])->name('templates.edit');
     Route::put('templates/{template}', [TemplateController::class, 'update'])->name('templates.update');
     Route::post('templates/{template}/jobs', [TemplateJobController::class, 'store'])->name('templates.jobs.store');
+
+    Route::get('api-keys', [ApiKeyController::class, 'index'])->name('api-keys.index');
+    Route::post('api-keys', [ApiKeyController::class, 'store'])->name('api-keys.store');
+    Route::delete('api-keys/{apiKey}', [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
 
     Route::get('scrape-jobs/{scrapeJob}/screenshot', [ScrapeJobArtifactController::class, 'screenshot'])->name('scrape-jobs.screenshot');
     Route::get('scrape-jobs/{scrapeJob}/html', [ScrapeJobArtifactController::class, 'html'])->name('scrape-jobs.html');
