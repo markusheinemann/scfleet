@@ -5,15 +5,19 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreScrapeJobRequest;
 use App\Models\ScrapeJob;
+use App\Models\Template;
 use Illuminate\Http\JsonResponse;
 
 class ScrapeController extends Controller
 {
     public function store(StoreScrapeJobRequest $request): JsonResponse
     {
+        $template = Template::findOrFail($request->validated('template_id'));
+
         $job = ScrapeJob::create([
             'url' => $request->validated('url'),
-            'template' => $request->validated('template'),
+            'template_id' => $template->id,
+            'template' => $template->template,
             'status' => 'pending',
         ]);
 

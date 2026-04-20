@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\ValidExtractionSchema;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -20,7 +19,7 @@ class StoreScrapeJobRequest extends FormRequest
     {
         return [
             'url' => ['required', 'string', 'url', 'max:2048'],
-            'template' => ['required', 'array', ValidExtractionSchema::forDecodedInput()],
+            'template_id' => ['required', 'integer', 'exists:templates,id'],
         ];
     }
 }

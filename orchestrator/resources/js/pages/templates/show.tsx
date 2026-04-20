@@ -10,6 +10,8 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Code2,
+  Copy,
   LoaderCircle,
   Pencil,
   Play,
@@ -50,6 +52,7 @@ type Props = {
   template: Template;
   jobs: ScrapeJob[];
   stats: Stats;
+  appUrl: string;
 };
 
 const STATUS_STYLES = {
@@ -205,7 +208,104 @@ function JobRow({ job }: { job: ScrapeJob }) {
   );
 }
 
-export default function TemplatesShow({ template, jobs, stats }: Props) {
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      onClick={copy}
+      title={copied ? 'Copied!' : 'Copy to clipboard'}
+      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <Copy className="size-3.5" />
+      <span className="sr-only">{copied ? 'Copied' : 'Copy'}</span>
+    </button>
+  );
+}
+
+function CodeSnippet({ code }: { code: string }) {
+  return (
+    <div className="relative rounded-md bg-muted">
+      <div className="absolute right-3 top-3">
+        <CopyButton text={code} />
+      </div>
+      <pre className="overflow-x-auto p-3 pr-10 font-mono text-xs leading-relaxed">{code}</pre>
+    </div>
+  );
+}
+
+function ApiUsage({ template, appUrl }: { template: Template; appUrl: string }) {
+  const [open, setOpen] = useState(false);
+
+  const submitSnippet = `curl -X POST ${appUrl}/api/v1/scrape \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url": "https://example.com", "template_id": ${template.id}}'`;
+
+  const pollSnippet = `curl ${appUrl}/api/v1/scrape/{job_id} \\
+  -H "Authorization: Bearer YOUR_API_KEY"`;
+
+  return (
+    <Card>
+      <CardHeader className="cursor-pointer select-none" onClick={() => setOpen(v => !v)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Code2 className="size-4 text-muted-foreground" />
+            <CardTitle>API usage</CardTitle>
+          </div>
+          {open ? (
+            <ChevronDown className="size-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="size-4 text-muted-foreground" />
+          )}
+        </div>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Use the REST API to submit scrape jobs programmatically. You'll need an{' '}
+            <Link href="/api-keys" className="underline underline-offset-4 hover:text-foreground">
+              API key
+            </Link>{' '}
+            to authenticate.
+          </p>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              1. Submit a scrape job
+            </p>
+            <CodeSnippet code={submitSnippet} />
+            <p className="text-xs text-muted-foreground">
+              Returns <code className="font-mono">202</code> with a{' '}
+              <code className="font-mono">job_id</code> you can use to poll for results.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              2. Poll for results
+            </p>
+            <CodeSnippet code={pollSnippet} />
+            <p className="text-xs text-muted-foreground">
+              Check <code className="font-mono">status</code> until it's{' '}
+              <code className="font-mono">completed</code> or{' '}
+              <code className="font-mono">failed</code>. Results are in the{' '}
+              <code className="font-mono">result</code> field.
+            </p>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+export default function TemplatesShow({ template, jobs, stats, appUrl }: Props) {
   const { props } = usePage<{ flash?: string }>();
   const [showRunForm, setShowRunForm] = useState(false);
 
@@ -341,6 +441,8 @@ export default function TemplatesShow({ template, jobs, stats }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      <ApiUsage template={template} appUrl={appUrl} />
 
       <Card>
         <CardHeader>

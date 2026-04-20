@@ -65,6 +65,7 @@ class TemplateController extends Controller
             'template' => $template->only(['id', 'title', 'template', 'created_at']),
             'jobs' => $jobs,
             'stats' => $stats,
+            'appUrl' => url('/'),
         ]);
     }
 

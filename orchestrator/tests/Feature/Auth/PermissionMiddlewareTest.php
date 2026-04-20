@@ -123,15 +123,17 @@ describe('role permissions mapping', function (): void {
             Permission::RegenerateAgentToken,
             Permission::ManageTemplates,
             Permission::ViewTemplates,
+            Permission::ManageApiKeys,
         ]);
     });
 
-    it('editor has agent and template permissions', function (): void {
+    it('editor has agent, template, and api key permissions', function (): void {
         expect(Role::Editor->permissions())->toBe([
             Permission::ManageAgents,
             Permission::ViewAgents,
             Permission::ManageTemplates,
             Permission::ViewTemplates,
+            Permission::ManageApiKeys,
         ]);
     });
 

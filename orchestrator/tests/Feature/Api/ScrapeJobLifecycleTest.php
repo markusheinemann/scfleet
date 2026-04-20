@@ -3,36 +3,20 @@
 use App\Models\Agent;
 use App\Models\ApiKey;
 use App\Models\ScrapeJob;
+use App\Models\Template;
 use Illuminate\Support\Str;
-
-/** Minimal template that passes ValidExtractionSchema validation. */
-function minimalTemplate(): array
-{
-    return [
-        'version' => '1',
-        'fields' => [
-            [
-                'name' => 'title',
-                'type' => 'string',
-                'required' => true,
-                'extractors' => [
-                    ['strategy' => 'css', 'selector' => 'h1'],
-                ],
-            ],
-        ],
-    ];
-}
 
 describe('POST /api/v1/scrape', function (): void {
     beforeEach(function (): void {
         $this->plainKey = Str::random(64);
         ApiKey::factory()->create(['key_hash' => hash('sha256', $this->plainKey)]);
+        $this->template = Template::factory()->create();
     });
 
     it('submits a scrape job and returns 202 with job_id', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ], ['Authorization' => "Bearer {$this->plainKey}"])
             ->assertStatus(202)
             ->assertJsonStructure(['job_id', 'status', 'created_at'])
@@ -41,10 +25,21 @@ describe('POST /api/v1/scrape', function (): void {
         expect(ScrapeJob::count())->toBe(1);
     });
 
+    it('stores the template json and template_id from the referenced template', function (): void {
+        $this->postJson('/api/v1/scrape', [
+            'url' => 'https://example.com',
+            'template_id' => $this->template->id,
+        ], ['Authorization' => "Bearer {$this->plainKey}"]);
+
+        $job = ScrapeJob::first();
+        expect($job->template_id)->toBe($this->template->id)
+            ->and($job->template)->toBe($this->template->template);
+    });
+
     it('computes and stores a template_hash', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ], ['Authorization' => "Bearer {$this->plainKey}"]);
 
         expect(ScrapeJob::first()->template_hash)->not->toBeNull()->toHaveLength(64);
@@ -53,20 +48,20 @@ describe('POST /api/v1/scrape', function (): void {
     it('returns 401 without an api key', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ])->assertUnauthorized();
     });
 
     it('returns 401 for an invalid api key', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ], ['Authorization' => 'Bearer invalid'])->assertUnauthorized();
     });
 
     it('returns 422 for a missing url', function (): void {
         $this->postJson('/api/v1/scrape', [
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ], ['Authorization' => "Bearer {$this->plainKey}"])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['url']);
@@ -75,18 +70,27 @@ describe('POST /api/v1/scrape', function (): void {
     it('returns 422 for an invalid url', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'not-a-url',
-            'template' => minimalTemplate(),
+            'template_id' => $this->template->id,
         ], ['Authorization' => "Bearer {$this->plainKey}"])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['url']);
     });
 
-    it('returns 422 for a missing template', function (): void {
+    it('returns 422 for a missing template_id', function (): void {
         $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
         ], ['Authorization' => "Bearer {$this->plainKey}"])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['template']);
+            ->assertJsonValidationErrors(['template_id']);
+    });
+
+    it('returns 422 for a non-existent template_id', function (): void {
+        $this->postJson('/api/v1/scrape', [
+            'url' => 'https://example.com',
+            'template_id' => 99999,
+        ], ['Authorization' => "Bearer {$this->plainKey}"])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['template_id']);
     });
 });
 
@@ -135,9 +139,11 @@ describe('Full scrape lifecycle', function (): void {
         $plainToken = Str::random(64);
         Agent::factory()->create(['token' => hash('sha256', $plainToken)]);
 
+        $template = Template::factory()->create();
+
         $jobId = $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com/product/1',
-            'template' => minimalTemplate(),
+            'template_id' => $template->id,
         ], ['Authorization' => "Bearer $plainKey"])
             ->assertStatus(202)
             ->json('job_id');
@@ -168,9 +174,11 @@ describe('Full scrape lifecycle', function (): void {
         $plainToken = Str::random(64);
         Agent::factory()->create(['token' => hash('sha256', $plainToken)]);
 
+        $template = Template::factory()->create();
+
         $jobId = $this->postJson('/api/v1/scrape', [
             'url' => 'https://example.com',
-            'template' => minimalTemplate(),
+            'template_id' => $template->id,
         ], ['Authorization' => "Bearer $plainKey"])->json('job_id');
 
         $this->postJson('/api/v1/jobs/claim', [], ['Authorization' => "Bearer $plainToken"])
