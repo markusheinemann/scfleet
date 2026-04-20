@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('templates', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('title');
-            $table->json('template');
-            $table->timestamps();
+        Schema::table('scrape_jobs', function (Blueprint $table) {
+            $table->boolean('has_artifacts')->default(false)->after('timeout_at');
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('templates');
+        Schema::table('scrape_jobs', function (Blueprint $table) {
+            $table->dropColumn('has_artifacts');
+        });
     }
 };

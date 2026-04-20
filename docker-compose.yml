@@ -38,6 +38,10 @@ services:
       LOG_LEVEL: debug
       DEV_AGENT_TOKEN: dev-agent-token
       RUN_MIGRATIONS: "1"
+    volumes:
+      - ./orchestrator:/var/www/html
+      - orchestrator-vendor:/var/www/html/vendor
+      - orchestrator-build:/var/www/html/public/build
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +57,8 @@ services:
       - --url=http://orchestrator
       - --token=dev-agent-token
       - --interval=30s
+      - --poll-base=2s
+      - --poll-max=10s
     depends_on:
       orchestrator:
         condition: service_healthy
@@ -60,3 +66,5 @@ services:
 
 volumes:
   db-data:
+  orchestrator-vendor:
+  orchestrator-build:

@@ -40,6 +40,11 @@ func (m *mockClient) Heartbeat(_ context.Context) error {
 	return m.heartbeatErr
 }
 
+// nopWorker is a Worker that returns immediately with no error.
+type nopWorker struct{}
+
+func (n *nopWorker) Run(_ context.Context) error { return nil }
+
 // waitFor blocks until n signals arrive on ch or the test times out.
 func waitFor(t *testing.T, ch <-chan struct{}, n int) {
 	t.Helper()
@@ -54,20 +59,17 @@ func waitFor(t *testing.T, ch <-chan struct{}, n int) {
 
 func TestRun_CallsRegisterOnce(t *testing.T) {
 	mock := newMock()
-	agent := lifecycle.New(mock, time.Hour, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Hour, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- agent.Run(ctx) }()
 
 	waitFor(t, mock.registered, 1)
-	// Wait for the immediate heartbeat before cancelling so we know
-	// the goroutine has progressed past Register.
 	waitFor(t, mock.heartbeated, 1)
 	cancel()
 	<-done
 
-	// registered channel had capacity 1 and we drained it once — Register was called exactly once.
 	select {
 	case <-mock.registered:
 		t.Error("Register was called more than once")
@@ -77,19 +79,16 @@ func TestRun_CallsRegisterOnce(t *testing.T) {
 
 func TestRun_SendsImmediateHeartbeatAfterRegistration(t *testing.T) {
 	mock := newMock()
-	// Use a very long ticker interval so no tick fires during the test.
-	agent := lifecycle.New(mock, time.Hour, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Hour, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- agent.Run(ctx) }()
 
-	// Wait for the immediate heartbeat, then cancel before any tick fires.
 	waitFor(t, mock.heartbeated, 1)
 	cancel()
 	<-done
 
-	// Drain any further heartbeats that might have raced in.
 	extra := 0
 	for {
 		select {
@@ -107,7 +106,7 @@ done:
 
 func TestRun_CallsHeartbeatOnTick(t *testing.T) {
 	mock := newMock()
-	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Millisecond, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -122,7 +121,7 @@ func TestRun_CallsHeartbeatOnTick(t *testing.T) {
 func TestRun_ReturnsErrorWhenRegisterFails(t *testing.T) {
 	mock := newMock()
 	mock.registerErr = errors.New("unauthorized")
-	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Millisecond, discardLogger)
 
 	err := agent.Run(context.Background())
 
@@ -138,7 +137,7 @@ func TestRun_ReturnsErrorWhenRegisterFails(t *testing.T) {
 
 func TestRun_ExitsOnContextCancellation(t *testing.T) {
 	mock := newMock()
-	agent := lifecycle.New(mock, time.Hour, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Hour, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -161,13 +160,12 @@ func TestRun_ExitsOnContextCancellation(t *testing.T) {
 func TestRun_HeartbeatErrorDoesNotStop(t *testing.T) {
 	mock := newMock()
 	mock.heartbeatErr = errors.New("timeout")
-	agent := lifecycle.New(mock, time.Millisecond, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, time.Millisecond, discardLogger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- agent.Run(ctx) }()
 
-	// Loop continues despite errors — wait for several heartbeats.
 	waitFor(t, mock.heartbeated, 3)
 	cancel()
 
@@ -178,7 +176,7 @@ func TestRun_HeartbeatErrorDoesNotStop(t *testing.T) {
 
 func TestRun_ReturnsErrorOnZeroInterval(t *testing.T) {
 	mock := newMock()
-	agent := lifecycle.New(mock, 0, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, 0, discardLogger)
 
 	err := agent.Run(context.Background())
 
@@ -189,7 +187,7 @@ func TestRun_ReturnsErrorOnZeroInterval(t *testing.T) {
 
 func TestRun_ReturnsErrorOnNegativeInterval(t *testing.T) {
 	mock := newMock()
-	agent := lifecycle.New(mock, -time.Second, discardLogger)
+	agent := lifecycle.New(mock, &nopWorker{}, -time.Second, discardLogger)
 
 	err := agent.Run(context.Background())
 

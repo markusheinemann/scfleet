@@ -2,16 +2,15 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Target;
 use App\Rules\ValidExtractionSchema;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreTargetRequest extends FormRequest
+class UpdateTemplateRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', Target::class);
+        return $this->user()->can('update', $this->route('template'));
     }
 
     /**
@@ -21,8 +20,7 @@ class StoreTargetRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'url' => ['required', 'string', 'url', 'max:2048'],
-            'schema' => ['bail', 'required', 'json', new ValidExtractionSchema],
+            'template' => ['bail', 'required', 'json', new ValidExtractionSchema],
         ];
     }
 }

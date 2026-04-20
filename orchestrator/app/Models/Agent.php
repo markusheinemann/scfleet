@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
-#[Fillable(['user_id', 'name', 'token'])]
+#[Fillable(['user_id', 'name', 'token', 'status'])]
 #[Hidden(['token'])]
 class Agent extends Model
 {
@@ -41,5 +42,10 @@ class Agent extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function scrapeJobs(): HasMany
+    {
+        return $this->hasMany(ScrapeJob::class);
     }
 }

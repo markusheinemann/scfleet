@@ -2,22 +2,21 @@
 
 namespace Database\Factories;
 
-use App\Models\Target;
+use App\Models\Template;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Target>
+ * @extends Factory<Template>
  */
-class TargetFactory extends Factory
+class TemplateFactory extends Factory
 {
     public function definition(): array
     {
         return [
             'user_id' => User::factory(),
             'title' => fake()->words(3, true),
-            'url' => fake()->url(),
-            'schema' => [
+            'template' => [
                 'version' => '1',
                 'fields' => [
                     [

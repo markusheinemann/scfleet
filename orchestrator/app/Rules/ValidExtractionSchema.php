@@ -17,9 +17,22 @@ class ValidExtractionSchema implements ValidationRule
 
     private static ?Validator $validator = null;
 
+    private bool $alreadyDecoded = false;
+
+    /** Use when the template arrives as an already-decoded PHP array (JSON API requests). */
+    public static function forDecodedInput(): self
+    {
+        $instance = new self;
+        $instance->alreadyDecoded = true;
+
+        return $instance;
+    }
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $data = json_decode($value);
+        $data = $this->alreadyDecoded
+            ? json_decode(json_encode($value))
+            : json_decode($value);
 
         if (! is_object($data)) {
             $fail('The :attribute must be a valid JSON object.');

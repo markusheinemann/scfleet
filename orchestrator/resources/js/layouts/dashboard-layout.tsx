@@ -40,7 +40,7 @@ type SharedProps = {
 const navItems = [
   { title: 'Dashboard', href: '/', icon: LayoutDashboard },
   { title: 'Agents', href: '/agents', icon: Bot },
-  { title: 'Targets', href: '/targets', icon: Target },
+  { title: 'Templates', href: '/templates', icon: Target },
 ];
 
 function AppSidebar() {

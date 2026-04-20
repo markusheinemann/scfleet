@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\ScrapeJobArtifactController;
 use App\Http\Controllers\SetupController;
-use App\Http\Controllers\TargetController;
+use App\Http\Controllers\TemplateController;
+use App\Http\Controllers\TemplateJobController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -22,9 +24,14 @@ Route::middleware('auth')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('agents.regenerate-token');
 
-    Route::get('targets/create', [TargetController::class, 'create'])->name('targets.create');
-    Route::get('targets', [TargetController::class, 'index'])->name('targets.index');
-    Route::post('targets', [TargetController::class, 'store'])->name('targets.store');
-    Route::get('targets/{target}/edit', [TargetController::class, 'edit'])->name('targets.edit');
-    Route::put('targets/{target}', [TargetController::class, 'update'])->name('targets.update');
+    Route::get('templates/create', [TemplateController::class, 'create'])->name('templates.create');
+    Route::get('templates', [TemplateController::class, 'index'])->name('templates.index');
+    Route::post('templates', [TemplateController::class, 'store'])->name('templates.store');
+    Route::get('templates/{template}', [TemplateController::class, 'show'])->name('templates.show');
+    Route::get('templates/{template}/edit', [TemplateController::class, 'edit'])->name('templates.edit');
+    Route::put('templates/{template}', [TemplateController::class, 'update'])->name('templates.update');
+    Route::post('templates/{template}/jobs', [TemplateJobController::class, 'store'])->name('templates.jobs.store');
+
+    Route::get('scrape-jobs/{scrapeJob}/screenshot', [ScrapeJobArtifactController::class, 'screenshot'])->name('scrape-jobs.screenshot');
+    Route::get('scrape-jobs/{scrapeJob}/html', [ScrapeJobArtifactController::class, 'html'])->name('scrape-jobs.html');
 });
