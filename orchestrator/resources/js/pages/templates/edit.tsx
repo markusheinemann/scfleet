@@ -74,11 +74,7 @@ export default function TemplatesEdit({ template }: Props) {
                       <div className="bg-muted animate-pulse h-[320px] w-full rounded-md" />
                     }
                   >
-                    <SchemaEditor
-                      value={schema}
-                      onChange={setSchema}
-                      invalid={!!errors.template}
-                    />
+                    <SchemaEditor value={schema} onChange={setSchema} invalid={!!errors.template} />
                   </Suspense>
                   <input type="hidden" name="template" value={schema} />
                   <FieldError>{errors.template}</FieldError>
