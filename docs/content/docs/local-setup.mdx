@@ -3,6 +3,8 @@ title: Local Setup
 description: Run the full Scraper Fleet stack locally with Docker Compose
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+
 This guide walks you through running the full Scraper Fleet stack locally using Docker Compose. By the end you will have:
 
 - The **orchestrator** web UI running at `http://localhost:8080`
@@ -16,7 +18,7 @@ This guide walks you through running the full Scraper Fleet stack locally using 
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | 4.x |
 | Docker Compose | v2 (bundled with Docker Desktop) |
 
-No other local dependencies are required — PHP, Go, and Node are all handled inside the containers.
+No other local dependencies are required. PHP, Go, and Node are all handled inside the containers.
 
 ## Quick Start
 
@@ -66,16 +68,20 @@ All service configuration is controlled through environment variables in `docker
 
 ### Agent
 
-| Variable / Flag | Default | Description |
-|-----------------|---------|-------------|
+The agent is configured via CLI flags passed in `docker-compose.yml`:
+
+| Flag | Default | Description |
+|------|---------|-------------|
 | `--url` | `http://orchestrator` | Orchestrator base URL |
 | `--token` | `dev-agent-token` | Bearer token |
 | `--interval` | `30s` | Heartbeat interval |
+| `--poll-base` | `2s` | Initial backoff between job poll requests |
+| `--poll-max` | `10s` | Maximum backoff between job poll requests |
 | `--debug` | off | Enable verbose HTTP logging |
 
 ## Frontend Development (HMR)
 
-For a faster frontend workflow, a `docker-compose.override.yml` file is included that adds a `vite` service running `npm run dev` inside a Node container. It mounts the `orchestrator/` directory directly, so any change to a TypeScript, CSS, or React file is reflected in the browser instantly via Hot Module Replacement — no image rebuild required.
+For a faster frontend workflow, a `docker-compose.override.yml` file is included that adds a `vite` service running `npm run dev` inside a Node container. It mounts the `orchestrator/` directory directly, so any change to a TypeScript, CSS, or React file is reflected in the browser instantly via Hot Module Replacement, with no image rebuild required.
 
 The override file is picked up automatically by Docker Compose:
 
@@ -140,7 +146,7 @@ docker compose up --build
 
 **Agent stays in "offline" state**
 
-The orchestrator marks an agent offline if it has not received a heartbeat within 120 seconds. Check agent logs with `docker compose logs agent`. If you see repeated `heartbeat failed` warnings, verify the orchestrator is reachable from inside the container network.
+The orchestrator marks an agent offline when no heartbeat has been received within the configured timeout (default: 120 seconds, controlled by `agent.offline_after`). Check agent logs with `docker compose logs agent`. If you see repeated `heartbeat failed` warnings, verify the orchestrator is reachable from inside the container network.
 
 **Port 8080 already in use**
 
