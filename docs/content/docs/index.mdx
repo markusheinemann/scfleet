@@ -1,30 +1,146 @@
 ---
 title: Introduction
-description: Overview of Scraper Fleet
+description: What Scraper Fleet is, how it works, and when to use it
 ---
 
-Scraper Fleet is a distributed web scraping platform made up of two components:
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Mermaid } from '@/components/mermaid';
 
-- **Orchestrator** — a Laravel web application that manages agents, users, and scraping tasks. It exposes a REST API that agents connect to.
-- **Agent** — a lightweight Go binary that registers itself with the orchestrator and sends periodic heartbeats to signal liveness.
+Scraper Fleet is a self-hosted platform for running web scraping jobs at scale. You define **extraction templates** that describe exactly what data to pull from a page — field names, types, and how to find each value — and a fleet of **agents** powered by headless Chrome executes those jobs in parallel and returns clean, structured JSON.
 
-## Architecture
+The system is built around two components that communicate over a REST API:
 
-```
-┌─────────────────────┐        HTTP (Bearer token)       ┌──────────────┐
-│    Orchestrator     │ ◄──────────────────────────────► │    Agent     │
-│  (Laravel + React)  │   POST /api/v1/register          │   (Go CLI)   │
-│                     │   POST /api/v1/heartbeat         │              │
-└─────────────────────┘                                  └──────────────┘
-          │
-          │
-    ┌─────▼──────┐
-    │ PostgreSQL  │
-    └────────────┘
-```
+- **Orchestrator** — a Laravel web application that manages users, agents, templates, and the full job lifecycle. It also exposes the external API that your applications call to submit jobs and retrieve results.
+- **Agent** — a lightweight Go binary. Each agent registers itself with the orchestrator, picks up pending jobs, renders the target URL in a real browser, extracts data using up to six strategies per field, and ships the result back — including a screenshot and raw HTML snapshot for debugging.
 
-Each agent authenticates using a unique bearer token that is created and managed through the orchestrator UI.
+You scale throughput by running more agents. Each one connects independently and starts processing jobs immediately.
+
+---
+
+## The Big Picture
+
+Most scraping tools are point solutions: a script, a cron job, a browser extension. They work fine until you need to scrape hundreds of URLs a day, handle JavaScript-rendered pages reliably, or share extraction logic across projects. At that point, operational complexity takes over — you're managing infrastructure, retries, scheduling, and results storage yourself.
+
+Scraper Fleet separates the *what* from the *how*. Templates describe the shape of the data you want. The infrastructure — browser fleet, job queue, retry logic, artifact storage — is handled by the platform. Your application only needs to call an API.
+
+<Mermaid chart={`
+sequenceDiagram
+    participant App as Your App
+    participant Orch as Orchestrator
+    participant Agent as Agent (×N)
+
+    App->>Orch: POST /api/v1/scrape (url + template_id)
+    Orch-->>App: { job_id, status: "pending" }
+
+    Agent->>Orch: POST /api/v1/jobs/claim
+    Orch-->>Agent: { job_id, url, template }
+
+    Note over Agent: Render page with headless Chrome<br/>Run up to 6 extraction strategies<br/>Coerce values to declared types
+
+    Agent->>Orch: POST /api/v1/jobs/{id}/complete (result JSON)
+    Agent->>Orch: POST /api/v1/jobs/{id}/artifacts (screenshot + HTML)
+
+    App->>Orch: GET /api/v1/scrape/{job_id}
+    Orch-->>App: { status: "completed", result: { ... } }
+`} />
+
+---
+
+## Extraction Strategy
+
+Every field in a template carries a list of extractor strategies. The agent tries them in order and uses the **first one that returns a non-empty value**. This fallback chain makes templates resilient: if the primary strategy fails because a site changed its markup, the next one picks up the slack.
+
+<Cards>
+  <Card title="CSS" description="CSS3 selector against the fully rendered DOM. Supports attribute extraction and collecting multiple matches into an array." />
+  <Card title="XPath 1.0" description="Advanced DOM traversal and predicates. Useful when CSS selectors aren't expressive enough." />
+  <Card title="Schema.org" description="Finds a JSON-LD block by @type, then traverses a dot-notation path. The most reliable strategy for structured product and article pages." />
+  <Card title="Microdata" description="Queries elements by itemprop= attribute per the HTML Microdata spec. Complements Schema.org on older sites." />
+  <Card title="Meta tags" description="Extracts content= from <meta> tags by property= or name=. Covers Open Graph, Twitter Cards, and standard meta descriptions." />
+  <Card title="JSON-LD (raw)" description="Direct path traversal of a JSON-LD block without @type matching. Useful when the type is unknown or varies by page." />
+</Cards>
+
+After extraction, each field can apply an optional **transform**: strip whitespace, run a regex capture group, and prepend or append a fixed string. The result is then coerced to the declared field type (`string`, `number`, `boolean`, or `array`).
+
+---
+
+## When to Use Scraper Fleet
+
+Scraper Fleet is a good fit if you need to:
+
+- Extract structured data from JavaScript-rendered pages (product pages, listings, articles)
+- Run the same extraction template across many URLs, programmatically via API
+- Debug extraction failures with browser screenshots and raw HTML
+- Scale throughput by adding more agents without changing your application code
+- Keep everything self-hosted under your own infrastructure
+
+It is not designed for crawling entire sites or following links automatically. Each job is a single URL with a known template.
+
+---
 
 ## Getting Started
 
-Follow the [Local Setup](/docs/local-setup) guide to run the full stack on your machine using Docker Compose in under five minutes.
+<Steps>
+  <Step>
+    **Run the stack locally**
+
+    The quickest way to see Scraper Fleet in action is Docker Compose. One command starts the orchestrator, database, and a pre-registered agent:
+
+    ```bash
+    git clone https://github.com/markusheinemann/scfleet.git
+    cd scfleet
+    docker compose up --build
+    ```
+
+    Open **http://localhost:8080** and log in with `test@example.com` / `password`.
+
+    See [Local Setup](/docs/local-setup) for full details, HMR development mode, and troubleshooting.
+  </Step>
+
+  <Step>
+    **Create a template**
+
+    In the orchestrator UI, go to **Templates → New template**. The editor validates your JSON against the full schema in real time and provides autocompletion.
+
+    See [Extraction Schema](/docs/extraction-schema) for the complete field and strategy reference.
+  </Step>
+
+  <Step>
+    **Create an API key**
+
+    Go to **API Keys → New key**. Copy the key — it is only shown once.
+  </Step>
+
+  <Step>
+    **Submit a job and read the result**
+
+    ```bash
+    # Submit
+    curl -X POST http://localhost:8080/api/v1/scrape \
+      -H "Authorization: Bearer <your-api-key>" \
+      -H "Content-Type: application/json" \
+      -d '{ "url": "https://example.com", "template_id": "<template-id>" }'
+
+    # Poll
+    curl http://localhost:8080/api/v1/scrape/<job-id> \
+      -H "Authorization: Bearer <your-api-key>"
+    ```
+  </Step>
+</Steps>
+
+<Callout type="info">
+  Jobs are processed asynchronously. Poll `GET /api/v1/scrape/{job_id}` until `status` is `completed` or `failed`. Typical latency depends on page load time and agent availability.
+</Callout>
+
+---
+
+## Core Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Template** | A JSON document that defines the fields to extract, the strategies to use, and optional transforms. Stored in the orchestrator and reused across many jobs. |
+| **Agent** | A Go process that claims jobs, renders pages with headless Chrome, runs extraction, and reports results. Identified by a unique bearer token. |
+| **Scrape job** | One unit of work: a URL paired with a template. Has a lifecycle: `pending → processing → completed / failed`. |
+| **Artifact** | A screenshot (PNG) and raw HTML snapshot stored with each job for debugging purposes. |
+| **API key** | A secret token that authorizes external applications to submit jobs and read results via the REST API. Separate from agent tokens. |
