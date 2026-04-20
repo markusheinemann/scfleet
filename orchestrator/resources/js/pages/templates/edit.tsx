@@ -13,36 +13,35 @@ const SchemaEditor = lazy(() =>
     : Promise.resolve({ default: () => null } as never)
 );
 
-type Target = {
+type Template = {
   id: number;
   title: string;
-  url: string;
-  schema: object;
+  template: object;
 };
 
 type Props = {
-  target: Target;
+  template: Template;
 };
 
-export default function TargetsEdit({ target }: Props) {
-  const [schema, setSchema] = useState(JSON.stringify(target.schema, null, 2));
+export default function TemplatesEdit({ template }: Props) {
+  const [schema, setSchema] = useState(JSON.stringify(template.template, null, 2));
 
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Edit Target</h1>
+        <h1 className="text-xl font-semibold">Edit Template</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Update the scraping target configuration.
+          Update the extraction template configuration.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Target details</CardTitle>
-          <CardDescription>Configure what to scrape.</CardDescription>
+          <CardTitle>Template details</CardTitle>
+          <CardDescription>Configure what data to extract.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form action={`/targets/${target.id}`} method="put">
+          <Form action={`/templates/${template.id}`} method="put">
             {({ errors, processing }) => (
               <FieldGroup>
                 <Field data-invalid={!!errors.title}>
@@ -52,28 +51,15 @@ export default function TargetsEdit({ target }: Props) {
                     name="title"
                     type="text"
                     placeholder="e.g. Product prices"
-                    defaultValue={target.title}
+                    defaultValue={template.title}
                     required
                   />
                   <FieldError>{errors.title}</FieldError>
                 </Field>
 
-                <Field data-invalid={!!errors.url}>
-                  <FieldLabel htmlFor="url">URL</FieldLabel>
-                  <Input
-                    id="url"
-                    name="url"
-                    type="url"
-                    placeholder="https://example.com/page"
-                    defaultValue={target.url}
-                    required
-                  />
-                  <FieldError>{errors.url}</FieldError>
-                </Field>
-
-                <Field data-invalid={!!errors.schema}>
+                <Field data-invalid={!!errors.template}>
                   <div className="flex items-center justify-between">
-                    <FieldLabel>Extraction Schema</FieldLabel>
+                    <FieldLabel>Extraction Template</FieldLabel>
                     <a
                       href="https://markusheinemann.github.io/scfleet/docs/extraction-schema"
                       target="_blank"
@@ -88,9 +74,14 @@ export default function TargetsEdit({ target }: Props) {
                       <div className="bg-muted animate-pulse h-[320px] w-full rounded-md" />
                     }
                   >
-                    <SchemaEditor value={schema} onChange={setSchema} invalid={!!errors.schema} />
+                    <SchemaEditor
+                      value={schema}
+                      onChange={setSchema}
+                      invalid={!!errors.template}
+                    />
                   </Suspense>
-                  <FieldError>{errors.schema}</FieldError>
+                  <input type="hidden" name="template" value={schema} />
+                  <FieldError>{errors.template}</FieldError>
                 </Field>
 
                 <Button type="submit" className="w-full" disabled={processing}>
@@ -106,4 +97,4 @@ export default function TargetsEdit({ target }: Props) {
   );
 }
 
-TargetsEdit.layout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;
+TemplatesEdit.layout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;

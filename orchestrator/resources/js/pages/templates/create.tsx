@@ -13,7 +13,7 @@ const SchemaEditor = lazy(() =>
     : Promise.resolve({ default: () => null } as never)
 );
 
-const DEFAULT_SCHEMA = JSON.stringify(
+const DEFAULT_TEMPLATE = JSON.stringify(
   {
     version: '1',
     fields: [
@@ -28,25 +28,25 @@ const DEFAULT_SCHEMA = JSON.stringify(
   2
 );
 
-export default function TargetsCreate() {
-  const [schema, setSchema] = useState(DEFAULT_SCHEMA);
+export default function TemplatesCreate() {
+  const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
 
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">New Target</h1>
+        <h1 className="text-xl font-semibold">New Template</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Define a website to scrape and the data to extract.
+          Define a reusable extraction template. The URL is provided when running a scrape.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Target details</CardTitle>
-          <CardDescription>Configure what to scrape.</CardDescription>
+          <CardTitle>Template details</CardTitle>
+          <CardDescription>Configure what data to extract.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form action="/targets" method="post">
+          <Form action="/templates" method="post">
             {({ errors, processing }) => (
               <FieldGroup>
                 <Field data-invalid={!!errors.title}>
@@ -61,21 +61,9 @@ export default function TargetsCreate() {
                   <FieldError>{errors.title}</FieldError>
                 </Field>
 
-                <Field data-invalid={!!errors.url}>
-                  <FieldLabel htmlFor="url">URL</FieldLabel>
-                  <Input
-                    id="url"
-                    name="url"
-                    type="url"
-                    placeholder="https://example.com/page"
-                    required
-                  />
-                  <FieldError>{errors.url}</FieldError>
-                </Field>
-
-                <Field data-invalid={!!errors.schema}>
+                <Field data-invalid={!!errors.template}>
                   <div className="flex items-center justify-between">
-                    <FieldLabel>Extraction Schema</FieldLabel>
+                    <FieldLabel>Extraction Template</FieldLabel>
                     <a
                       href="https://markusheinemann.github.io/scfleet/docs/extraction-schema"
                       target="_blank"
@@ -88,14 +76,19 @@ export default function TargetsCreate() {
                   <Suspense
                     fallback={<div className="bg-muted animate-pulse h-80 w-full rounded-md" />}
                   >
-                    <SchemaEditor value={schema} onChange={setSchema} invalid={!!errors.schema} />
+                    <SchemaEditor
+                      value={template}
+                      onChange={setTemplate}
+                      invalid={!!errors.template}
+                    />
                   </Suspense>
-                  <FieldError>{errors.schema}</FieldError>
+                  <input type="hidden" name="template" value={template} />
+                  <FieldError>{errors.template}</FieldError>
                 </Field>
 
                 <Button type="submit" className="w-full" disabled={processing}>
                   {processing && <LoaderCircle className="animate-spin" />}
-                  Create Target
+                  Create Template
                 </Button>
               </FieldGroup>
             )}
@@ -106,4 +99,4 @@ export default function TargetsCreate() {
   );
 }
 
-TargetsCreate.layout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;
+TemplatesCreate.layout = (page: React.ReactNode) => <DashboardLayout>{page}</DashboardLayout>;

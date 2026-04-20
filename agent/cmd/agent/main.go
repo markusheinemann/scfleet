@@ -13,6 +13,8 @@ import (
 
 	"github.com/markusheinemann/scfleet/agent/internal/api"
 	"github.com/markusheinemann/scfleet/agent/internal/lifecycle"
+	"github.com/markusheinemann/scfleet/agent/internal/scraper"
+	"github.com/markusheinemann/scfleet/agent/internal/worker"
 )
 
 func main() {
@@ -25,16 +27,18 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("agent", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
-	url := fs.String("url", "", "orchestrator base URL (required)")
+	orchestratorURL := fs.String("url", "", "orchestrator base URL (required)")
 	token := fs.String("token", "", "agent bearer token (required)")
 	interval := fs.Duration("interval", 30*time.Second, "heartbeat interval")
+	pollBase := fs.Duration("poll-base", 5*time.Second, "initial job poll interval")
+	pollMax := fs.Duration("poll-max", 60*time.Second, "maximum job poll interval (with backoff)")
 	debug := fs.Bool("debug", false, "enable debug logging")
 
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
 
-	if *url == "" || *token == "" {
+	if *orchestratorURL == "" || *token == "" {
 		fmt.Fprintln(stderr, "error: --url and --token are required")
 		fs.Usage()
 		return 1
@@ -46,10 +50,12 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	}
 
 	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: level}))
-	logger.Info("agent starting", "url", *url, "interval", *interval)
+	logger.Info("agent starting", "url", *orchestratorURL, "interval", *interval)
 
-	client := api.New(*url, *token, nil, logger)
-	agent := lifecycle.New(client, *interval, logger)
+	client := api.New(*orchestratorURL, *token, nil, logger)
+	s := scraper.New(logger)
+	w := worker.New(client, s, *pollBase, *pollMax, logger)
+	agent := lifecycle.New(client, w, *interval, logger)
 
 	if err := agent.Run(ctx); err != nil {
 		logger.Error("agent stopped", "error", err)
@@ -57,5 +63,6 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 	}
 
 	logger.Info("agent stopped")
+
 	return 0
 }

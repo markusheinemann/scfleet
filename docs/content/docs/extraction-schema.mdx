@@ -100,9 +100,19 @@ Finds a JSON-LD block whose `@type` matches, then traverses a dot-notation path 
 }
 ```
 
+When you don't know the `@type` in advance, use `"*"` to search all JSON-LD blocks and return the first block that contains the given path:
+
+```json
+{
+  "strategy": "schema_org",
+  "schema_type": "*",
+  "path": "aggregateRating.ratingValue"
+}
+```
+
 | Property | Required | Description |
 |---|---|---|
-| `schema_type` | ✓ | Schema.org type to match (case-insensitive). Examples: `"Product"`, `"Offer"`, `"AggregateRating"`, `"Article"`. |
+| `schema_type` | ✓ | Schema.org type to match (case-insensitive). Examples: `"Product"`, `"Offer"`, `"AggregateRating"`, `"Article"`. Use `"*"` to match any type — useful when the type varies by page (e.g. `"Hotel"`, `"VacationRental"`, `"LodgingBusiness"` on accommodation sites). |
 | `path` | ✓ | Dot-notation path into the matched object. Array indexing via numeric keys: `"images.0"`. |
 
 ### `microdata`

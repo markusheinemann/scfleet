@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ApiKeyMiddleware;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RedirectIfNoUsers;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
+            'api.key' => ApiKeyMiddleware::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
