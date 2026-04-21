@@ -2,13 +2,7 @@
 
 **Scraper Fleet** is a self-hosted, distributed web scraping platform. You define extraction templates (what data to pull from a page and how to find it) and a fleet of headless Chrome agents executes those jobs in parallel and returns structured JSON.
 
-```
-┌────────────────────────────┐        REST API          ┌──────────────────┐
-│   Orchestrator             │ ◄──────────────────────► │   Agent (×N)     │
-│   Laravel + React UI       │   register / heartbeat   │   Go + Chromedp  │
-│   PostgreSQL               │   claim / complete / fail│   headless Chrome │
-└────────────────────────────┘                          └──────────────────┘
-```
+![Architecture diagram](docs/architecture.svg)
 
 The **orchestrator** is a Laravel web application that handles everything: user accounts, agent registration, extraction templates, job queuing, and results. The **agent** is a standalone Go binary that polls for pending jobs, renders pages using a real browser, runs up to six extraction strategies per field, and ships the results back (including a screenshot and raw HTML for debugging).
 
@@ -42,7 +36,7 @@ docker compose up --build
 
 Open **http://localhost:8080** and log in with `test@example.com` / `password`.
 
-See the [Local Setup guide](https://scfleet.dev/docs/local-setup) for configuration options, frontend HMR setup, and troubleshooting.
+See the [Local Setup guide](https://markusheinemann.github.io/scfleet/docs/local-setup) for configuration options, frontend HMR setup, and troubleshooting.
 
 ---
 
@@ -123,11 +117,11 @@ Agents authenticate with unique bearer tokens created in the orchestrator UI. Ex
 
 ## Documentation
 
-Full documentation lives at **[scfleet.dev/docs](https://scfleet.dev/docs)**:
+Full documentation lives at **[https://markusheinemann.github.io/scfleet/docs/](https://markusheinemann.github.io/scfleet/docs/)**:
 
-- [Introduction](https://scfleet.dev/docs): big picture and concepts
-- [Local Setup](https://scfleet.dev/docs/local-setup): Docker Compose, HMR, troubleshooting
-- [Extraction Schema](https://scfleet.dev/docs/extraction-schema): full template reference
+- [Introduction](https://markusheinemann.github.io/scfleet/docs/): big picture and concepts
+- [Local Setup](https://markusheinemann.github.io/scfleet/docs/local-setup): Docker Compose, HMR, troubleshooting
+- [Extraction Schema](https://markusheinemann.github.io/scfleet/docs/extraction-schema): full template reference
 
 ---
 

@@ -29,22 +29,24 @@ type Scraper interface {
 
 // Worker runs the poll → scrape → extract → report loop.
 type Worker struct {
-	client      APIClient
-	scraper     Scraper
-	logger      *slog.Logger
-	pollBase    time.Duration
-	pollMax     time.Duration
-	pollCurrent time.Duration
+	client       APIClient
+	scraper      Scraper
+	logger       *slog.Logger
+	pollBase     time.Duration
+	pollMax      time.Duration
+	pollCurrent  time.Duration
+	newExtractor func(string) (*extractor.Engine, error)
 }
 
 // New creates a Worker with exponential backoff polling between pollBase and pollMax.
 func New(client APIClient, s Scraper, pollBase, pollMax time.Duration, logger *slog.Logger) *Worker {
 	return &Worker{
-		client:  client,
-		scraper: s,
-		logger:  logger,
-		pollBase: pollBase,
-		pollMax:  pollMax,
+		client:       client,
+		scraper:      s,
+		logger:       logger,
+		pollBase:     pollBase,
+		pollMax:      pollMax,
+		newExtractor: extractor.New,
 	}
 }
 
@@ -119,7 +121,7 @@ func (w *Worker) executeJob(ctx context.Context, job *api.ClaimedJob) error {
 		return w.reportFail(ctx, job.JobID, "navigation_error", fetchErr.Error())
 	}
 
-	engine, err := extractor.New(fetched.HTML)
+	engine, err := w.newExtractor(fetched.HTML)
 	if err != nil {
 		return w.reportFail(ctx, job.JobID, "extraction_error", "failed to parse HTML: "+err.Error())
 	}
@@ -127,12 +129,9 @@ func (w *Worker) executeJob(ctx context.Context, job *api.ClaimedJob) error {
 	result, err := engine.Extract(&tmpl)
 	if err != nil {
 		var ee *extractor.ExtractionError
-		if errors.As(err, &ee) {
-			return w.reportFail(ctx, job.JobID, "missing_required_field",
-				fmt.Sprintf("required field %q: no extractor yielded a value", ee.FieldName))
-		}
-
-		return w.reportFail(ctx, job.JobID, "extraction_error", err.Error())
+		errors.As(err, &ee)
+		return w.reportFail(ctx, job.JobID, "missing_required_field",
+			fmt.Sprintf("required field %q: no extractor yielded a value", ee.FieldName))
 	}
 
 	w.logger.Info("job completed", "job_id", job.JobID, "fields", len(result.Data))
