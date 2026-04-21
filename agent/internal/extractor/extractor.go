@@ -3,6 +3,7 @@ package extractor
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -73,12 +74,16 @@ type Engine struct {
 
 // New parses the raw HTML once and returns an Engine ready to extract.
 func New(rawHTML string) (*Engine, error) {
-	gqDoc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
+	return newFromReaders(strings.NewReader(rawHTML), strings.NewReader(rawHTML))
+}
+
+func newFromReaders(gqr, xr io.Reader) (*Engine, error) {
+	gqDoc, err := goquery.NewDocumentFromReader(gqr)
 	if err != nil {
 		return nil, fmt.Errorf("parse html (goquery): %w", err)
 	}
 
-	xpathDoc, err := htmlquery.Parse(strings.NewReader(rawHTML))
+	xpathDoc, err := htmlquery.Parse(xr)
 	if err != nil {
 		return nil, fmt.Errorf("parse html (htmlquery): %w", err)
 	}
@@ -94,14 +99,7 @@ func (e *Engine) Extract(tmpl *Template) (*Result, error) {
 	}
 
 	for _, field := range tmpl.Fields {
-		raw, err := e.extractField(field)
-		if err != nil {
-			if field.Required {
-				return nil, &ExtractionError{FieldName: field.Name}
-			}
-			result.FieldErrors[field.Name] = err.Error()
-			continue
-		}
+		raw := e.extractField(field)
 
 		if raw == "" {
 			if field.Required {
@@ -132,7 +130,7 @@ func (e *Engine) Extract(tmpl *Template) (*Result, error) {
 }
 
 // extractField tries each extractor in order; returns the first non-empty value.
-func (e *Engine) extractField(field Field) (string, error) {
+func (e *Engine) extractField(field Field) string {
 	isArray := field.Type == "array"
 
 	for _, ext := range field.Extractors {
@@ -142,11 +140,11 @@ func (e *Engine) extractField(field Field) (string, error) {
 		}
 
 		if val != "" {
-			return val, nil
+			return val
 		}
 	}
 
-	return "", nil
+	return ""
 }
 
 func (e *Engine) runExtractor(ext Extractor, multiple bool) (string, error) {

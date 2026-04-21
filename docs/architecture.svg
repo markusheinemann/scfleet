@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 220" width="740" height="220"
+     font-family="ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace">
+  <defs>
+    <style>
+      .orch-box    { fill: #f0f4ff; stroke: #6b8cff; }
+      .orch-title  { fill: #1e3a8a; }
+      .orch-div    { stroke: #c7d2fe; }
+      .orch-text   { fill: #3b4a6b; }
+      .agent-box   { fill: #f0fff4; stroke: #34d399; }
+      .agent-title { fill: #065f46; }
+      .agent-div   { stroke: #a7f3d0; }
+      .agent-text  { fill: #1f4a36; }
+      .arrow       { stroke: #94a3b8; }
+      .arrowhead   { fill: #94a3b8; }
+      .lbl-top     { fill: #475569; }
+      .lbl-bot     { fill: #64748b; }
+
+      @media (prefers-color-scheme: dark) {
+        .orch-box    { fill: #1a2340; stroke: #818cf8; }
+        .orch-title  { fill: #a5b4fc; }
+        .orch-div    { stroke: #2e3a60; }
+        .orch-text   { fill: #8899cc; }
+        .agent-box   { fill: #0d2318; stroke: #34d399; }
+        .agent-title { fill: #6ee7b7; }
+        .agent-div   { stroke: #163d27; }
+        .agent-text  { fill: #4aaa7a; }
+        .arrow       { stroke: #475569; }
+        .arrowhead   { fill: #475569; }
+        .lbl-top     { fill: #94a3b8; }
+        .lbl-bot     { fill: #64748b; }
+      }
+    </style>
+  </defs>
+
+  <!-- Orchestrator box -->
+  <rect x="20" y="40" width="220" height="140" rx="10" ry="10"
+        class="orch-box" stroke-width="2"/>
+  <text x="130" y="74" text-anchor="middle" font-size="14" font-weight="600"
+        class="orch-title">Orchestrator</text>
+  <line x1="40" y1="82" x2="220" y2="82" class="orch-div" stroke-width="1"/>
+  <text x="130" y="103" text-anchor="middle" font-size="12" class="orch-text">Laravel 13 + React 19</text>
+  <text x="130" y="121" text-anchor="middle" font-size="12" class="orch-text">PostgreSQL 17</text>
+  <text x="130" y="139" text-anchor="middle" font-size="12" class="orch-text">Job lifecycle &amp; UI</text>
+  <text x="130" y="157" text-anchor="middle" font-size="12" class="orch-text">Artifact storage</text>
+
+  <!-- Agent box -->
+  <rect x="500" y="40" width="220" height="140" rx="10" ry="10"
+        class="agent-box" stroke-width="2"/>
+  <text x="610" y="74" text-anchor="middle" font-size="14" font-weight="600"
+        class="agent-title">Agent (×N)</text>
+  <line x1="520" y1="82" x2="700" y2="82" class="agent-div" stroke-width="1"/>
+  <text x="610" y="103" text-anchor="middle" font-size="12" class="agent-text">Go 1.24 · chromedp</text>
+  <text x="610" y="121" text-anchor="middle" font-size="12" class="agent-text">Headless Chrome</text>
+  <text x="610" y="139" text-anchor="middle" font-size="12" class="agent-text">Scrape + Extract</text>
+  <text x="610" y="157" text-anchor="middle" font-size="12" class="agent-text">Report results</text>
+
+  <!-- Arrow -->
+  <line x1="240" y1="110" x2="500" y2="110" class="arrow" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <polygon points="244,105 240,110 244,115" class="arrowhead"/>
+  <polygon points="496,105 500,110 496,115" class="arrowhead"/>
+
+  <!-- Labels -->
+  <text x="370" y="97" text-anchor="middle" font-size="11" class="lbl-top">REST API · Bearer token</text>
+  <text x="290" y="120" text-anchor="start"  font-size="10" class="lbl-bot">register · heartbeat</text>
+  <text x="290" y="133" text-anchor="start"  font-size="10" class="lbl-bot">claim · complete · fail</text>
+</svg>

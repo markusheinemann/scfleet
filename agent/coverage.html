@@ -1,0 +1,1215 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>api: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/markusheinemann/scfleet/agent/internal/api/client.go (90.8%)</option>
+				
+				<option value="file1">github.com/markusheinemann/scfleet/agent/internal/extractor/coerce.go (95.0%)</option>
+				
+				<option value="file2">github.com/markusheinemann/scfleet/agent/internal/extractor/css.go (98.2%)</option>
+				
+				<option value="file3">github.com/markusheinemann/scfleet/agent/internal/extractor/extractor.go (84.6%)</option>
+				
+				<option value="file4">github.com/markusheinemann/scfleet/agent/internal/extractor/jsonld.go (94.1%)</option>
+				
+				<option value="file5">github.com/markusheinemann/scfleet/agent/internal/extractor/transform.go (100.0%)</option>
+				
+				<option value="file6">github.com/markusheinemann/scfleet/agent/internal/extractor/xpath.go (100.0%)</option>
+				
+				<option value="file7">github.com/markusheinemann/scfleet/agent/internal/lifecycle/agent.go (100.0%)</option>
+				
+				<option value="file8">github.com/markusheinemann/scfleet/agent/internal/scraper/scraper.go (8.7%)</option>
+				
+				<option value="file9">github.com/markusheinemann/scfleet/agent/internal/worker/worker.go (91.2%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package api
+
+import (
+        "bytes"
+        "context"
+        "encoding/base64"
+        "encoding/json"
+        "fmt"
+        "io"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+)
+
+// Client sends authenticated requests to the orchestrator API.
+type Client struct {
+        baseURL    string
+        token      string
+        httpClient *http.Client
+        logger     *slog.Logger
+}
+
+// New creates a Client targeting baseURL with the given bearer token.
+func New(baseURL, token string, httpClient *http.Client, logger *slog.Logger) *Client <span class="cov8" title="1">{
+        if httpClient == nil </span><span class="cov8" title="1">{
+                httpClient = http.DefaultClient
+        }</span>
+
+        <span class="cov8" title="1">return &amp;Client{
+                baseURL:    baseURL,
+                token:      token,
+                httpClient: httpClient,
+                logger:     logger,
+        }</span>
+}
+
+// Register signals the orchestrator that this agent has started.
+func (c *Client) Register(ctx context.Context) error <span class="cov8" title="1">{
+        return c.post(ctx, "/api/v1/register")
+}</span>
+
+// Heartbeat signals the orchestrator that this agent is still alive.
+func (c *Client) Heartbeat(ctx context.Context) error <span class="cov8" title="1">{
+        return c.post(ctx, "/api/v1/heartbeat")
+}</span>
+
+// PollJob attempts to claim a pending job.
+// Returns (nil, nil) when no jobs are available (204 response).
+func (c *Client) PollJob(ctx context.Context) (*ClaimedJob, error) <span class="cov8" title="1">{
+        target, err := url.JoinPath(c.baseURL, "/api/v1/jobs/claim")
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("build url: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">req, _ := http.NewRequestWithContext(ctx, http.MethodPost, target, nil)
+        req.Header.Set("Authorization", "Bearer "+c.token)
+
+        resp, err := c.httpClient.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("poll job: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        if resp.StatusCode == http.StatusNoContent </span><span class="cov8" title="1">{
+                return nil, nil
+        }</span>
+
+        <span class="cov8" title="1">if resp.StatusCode != http.StatusOK </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("poll job: unexpected status %d", resp.StatusCode)
+        }</span>
+
+        <span class="cov8" title="1">var job ClaimedJob
+        if err := json.NewDecoder(resp.Body).Decode(&amp;job); err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("decode job: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;job, nil</span>
+}
+
+// CompleteJob reports successful extraction results.
+func (c *Client) CompleteJob(ctx context.Context, jobID string, req CompleteJobRequest) error <span class="cov8" title="1">{
+        return c.postJSON(ctx, "/api/v1/jobs/"+jobID+"/complete", req)
+}</span>
+
+// FailJob reports that the job failed.
+func (c *Client) FailJob(ctx context.Context, jobID string, req FailJobRequest) error <span class="cov8" title="1">{
+        return c.postJSON(ctx, "/api/v1/jobs/"+jobID+"/fail", req)
+}</span>
+
+// UploadArtifacts sends the page screenshot and HTML to the orchestrator for debugging.
+func (c *Client) UploadArtifacts(ctx context.Context, jobID string, screenshot []byte, html string) error <span class="cov8" title="1">{
+        req := UploadArtifactsRequest{HTML: html}
+        if len(screenshot) &gt; 0 </span><span class="cov8" title="1">{
+                req.Screenshot = base64.StdEncoding.EncodeToString(screenshot)
+        }</span>
+
+        <span class="cov8" title="1">return c.postJSON(ctx, "/api/v1/jobs/"+jobID+"/artifacts", req)</span>
+}
+
+func (c *Client) postJSON(ctx context.Context, path string, body any) error <span class="cov8" title="1">{
+        target, err := url.JoinPath(c.baseURL, path)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("build url: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">data, err := json.Marshal(body)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("marshal body: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">req, _ := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(data))
+        req.Header.Set("Authorization", "Bearer "+c.token)
+        req.Header.Set("Content-Type", "application/json")
+
+        start := time.Now()
+        resp, err := c.httpClient.Do(req)
+        elapsed := time.Since(start)
+
+        if err != nil </span><span class="cov0" title="0">{
+                c.logger.Debug("request failed", "url", target, "error", err, "duration", elapsed)
+                return fmt.Errorf("send request: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+        io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+        if resp.StatusCode &lt; 200 || resp.StatusCode &gt;= 300 </span><span class="cov8" title="1">{
+                return fmt.Errorf("unexpected status %d", resp.StatusCode)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (c *Client) post(ctx context.Context, path string) error <span class="cov8" title="1">{
+        target, err := url.JoinPath(c.baseURL, path)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("build url: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">req, _ := http.NewRequestWithContext(ctx, http.MethodPost, target, nil)
+        req.Header.Set("Authorization", "Bearer "+c.token)
+
+        c.logger.Debug("sending request", "method", http.MethodPost, "url", req.URL.String())
+
+        start := time.Now()
+        resp, err := c.httpClient.Do(req)
+        elapsed := time.Since(start)
+
+        if err != nil </span><span class="cov8" title="1">{
+                c.logger.Debug("request failed", "url", target, "error", err, "duration", elapsed)
+                return fmt.Errorf("send request: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        c.logger.Debug("response received", "status", resp.StatusCode, "duration", elapsed)
+
+        if resp.StatusCode &lt; 200 || resp.StatusCode &gt;= 300 </span><span class="cov8" title="1">{
+                return fmt.Errorf("unexpected status %d", resp.StatusCode)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package extractor
+
+import (
+        "encoding/json"
+        "fmt"
+        "strconv"
+        "strings"
+)
+
+// coerce converts a raw string value to the target type.
+// For "array", raw must be a JSON-encoded string array produced by a multiple-mode extractor.
+func coerce(raw, targetType, itemType string) (any, error) <span class="cov8" title="1">{
+        switch targetType </span>{
+        case "string", "":<span class="cov8" title="1">
+                return raw, nil</span>
+
+        case "number":<span class="cov8" title="1">
+                cleaned := strings.ReplaceAll(raw, ",", "")
+                return strconv.ParseFloat(strings.TrimSpace(cleaned), 64)</span>
+
+        case "boolean":<span class="cov8" title="1">
+                return parseBool(raw)</span>
+
+        case "array":<span class="cov8" title="1">
+                var items []string
+                if err := json.Unmarshal([]byte(raw), &amp;items); err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("coerce array: %w", err)
+                }</span>
+
+                <span class="cov8" title="1">result := make([]any, 0, len(items))
+                for _, item := range items </span><span class="cov8" title="1">{
+                        v, err := coerce(item, itemType, "")
+                        if err != nil </span><span class="cov8" title="1">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">result = append(result, v)</span>
+                }
+
+                <span class="cov8" title="1">return result, nil</span>
+
+        default:<span class="cov8" title="1">
+                return nil, fmt.Errorf("unknown type: %s", targetType)</span>
+        }
+}
+
+func parseBool(s string) (bool, error) <span class="cov8" title="1">{
+        switch strings.ToLower(strings.TrimSpace(s)) </span>{
+        case "true", "1", "yes":<span class="cov8" title="1">
+                return true, nil</span>
+        case "false", "0", "no":<span class="cov8" title="1">
+                return false, nil</span>
+        }
+
+        <span class="cov8" title="1">return false, fmt.Errorf("cannot coerce %q to boolean", s)</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package extractor
+
+import (
+        "fmt"
+        "strings"
+
+        "github.com/PuerkitoBio/goquery"
+)
+
+func (e *Engine) runCSS(ext Extractor, multiple bool) (string, error) <span class="cov8" title="1">{
+        sel := e.gqDoc.Find(ext.Selector)
+        if sel.Length() == 0 </span><span class="cov8" title="1">{
+                return "", nil
+        }</span>
+
+        <span class="cov8" title="1">attr := ext.Attribute
+        if attr == "" </span><span class="cov8" title="1">{
+                attr = "innerText"
+        }</span>
+
+        <span class="cov8" title="1">if multiple </span><span class="cov8" title="1">{
+                var parts []string
+                sel.Each(func(_ int, s *goquery.Selection) </span><span class="cov8" title="1">{
+                        if v := extractAttr(s, attr); v != "" </span><span class="cov8" title="1">{
+                                parts = append(parts, v)
+                        }</span>
+                })
+                <span class="cov8" title="1">return encodeArray(parts), nil</span>
+        }
+
+        <span class="cov8" title="1">return extractAttr(sel.First(), attr), nil</span>
+}
+
+func extractAttr(s *goquery.Selection, attr string) string <span class="cov8" title="1">{
+        switch attr </span>{
+        case "innerText":<span class="cov8" title="1">
+                return strings.TrimSpace(s.Text())</span>
+        case "html":<span class="cov8" title="1">
+                h, _ := s.Html()
+                return h</span>
+        default:<span class="cov8" title="1">
+                v, _ := s.Attr(attr)
+                return v</span>
+        }
+}
+
+func (e *Engine) runMeta(ext Extractor) (string, error) <span class="cov8" title="1">{
+        propLower := strings.ToLower(ext.Property)
+
+        var found string
+
+        e.gqDoc.Find("meta").EachWithBreak(func(_ int, s *goquery.Selection) bool </span><span class="cov8" title="1">{
+                if prop, _ := s.Attr("property"); strings.ToLower(prop) == propLower </span><span class="cov8" title="1">{
+                        found, _ = s.Attr("content")
+                        return false
+                }</span>
+
+                <span class="cov8" title="1">return true</span>
+        })
+
+        <span class="cov8" title="1">if found != "" </span><span class="cov8" title="1">{
+                return found, nil
+        }</span>
+
+        <span class="cov8" title="1">e.gqDoc.Find("meta").EachWithBreak(func(_ int, s *goquery.Selection) bool </span><span class="cov8" title="1">{
+                if name, _ := s.Attr("name"); strings.ToLower(name) == propLower </span><span class="cov8" title="1">{
+                        found, _ = s.Attr("content")
+                        return false
+                }</span>
+
+                <span class="cov0" title="0">return true</span>
+        })
+
+        <span class="cov8" title="1">return found, nil</span>
+}
+
+func (e *Engine) runMicrodata(ext Extractor, multiple bool) (string, error) <span class="cov8" title="1">{
+        sel := e.gqDoc.Find(fmt.Sprintf("[itemprop=%q]", ext.Itemprop))
+        if sel.Length() == 0 </span><span class="cov8" title="1">{
+                return "", nil
+        }</span>
+
+        <span class="cov8" title="1">extract := func(s *goquery.Selection) string </span><span class="cov8" title="1">{
+                tag := goquery.NodeName(s)
+                switch tag </span>{
+                case "meta":<span class="cov8" title="1">
+                        v, _ := s.Attr("content")
+                        return v</span>
+                case "link":<span class="cov8" title="1">
+                        v, _ := s.Attr("href")
+                        return v</span>
+                default:<span class="cov8" title="1">
+                        if ext.Attribute != "" </span><span class="cov8" title="1">{
+                                v, _ := s.Attr(ext.Attribute)
+                                return v
+                        }</span>
+
+                        <span class="cov8" title="1">return strings.TrimSpace(s.Text())</span>
+                }
+        }
+
+        <span class="cov8" title="1">if multiple </span><span class="cov8" title="1">{
+                var parts []string
+                sel.Each(func(_ int, s *goquery.Selection) </span><span class="cov8" title="1">{
+                        if v := extract(s); v != "" </span><span class="cov8" title="1">{
+                                parts = append(parts, v)
+                        }</span>
+                })
+
+                <span class="cov8" title="1">return encodeArray(parts), nil</span>
+        }
+
+        <span class="cov8" title="1">return extract(sel.First()), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package extractor
+
+import (
+        "encoding/json"
+        "fmt"
+        "strings"
+
+        "github.com/PuerkitoBio/goquery"
+        "github.com/antchfx/htmlquery"
+        "golang.org/x/net/html"
+)
+
+// Template mirrors the extraction schema structure from the orchestrator.
+type Template struct {
+        Version        string  `json:"version"`
+        JSWaitSelector string  `json:"js_wait_selector"`
+        PageTimeoutS   int     `json:"page_timeout_s"`
+        Fields         []Field `json:"fields"`
+}
+
+// Field is one item to extract from the page.
+type Field struct {
+        Name       string      `json:"name"`
+        Type       string      `json:"type"`      // string|number|boolean|array
+        ItemType   string      `json:"item_type"` // element type when Type==array
+        Required   bool        `json:"required"`
+        Extractors []Extractor `json:"extractors"`
+        Transform  *Transform  `json:"transform"`
+}
+
+// Extractor defines one strategy for extracting a value.
+type Extractor struct {
+        Strategy   string `json:"strategy"`    // css|xpath|schema_org|microdata|meta|json_ld
+        Selector   string `json:"selector"`
+        Attribute  string `json:"attribute"`
+        Multiple   bool   `json:"multiple"`
+        Itemprop   string `json:"itemprop"`
+        Property   string `json:"property"`
+        SchemaType string `json:"schema_type"`
+        Path       string `json:"path"`
+        BlockIndex int    `json:"block_index"`
+}
+
+// Transform is an optional post-processing pipeline applied to the raw value.
+type Transform struct {
+        Trim    *bool  `json:"trim"`
+        Regex   string `json:"regex"`
+        Prepend string `json:"prepend"`
+        Append  string `json:"append"`
+}
+
+// Result is the extraction output for a single job.
+type Result struct {
+        Data        map[string]any    // field name → coerced value
+        FieldErrors map[string]string // field name → error message (non-required misses)
+}
+
+// ExtractionError is returned when a required field yields no value.
+type ExtractionError struct {
+        FieldName string
+}
+
+func (e *ExtractionError) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("required field %q: no extractor yielded a value", e.FieldName)
+}</span>
+
+// Engine holds parsed document representations for efficient multi-strategy extraction.
+type Engine struct {
+        gqDoc      *goquery.Document
+        xpathDoc   *html.Node
+        jsonLDOnce []string // lazy-parsed JSON-LD blocks
+}
+
+// New parses the raw HTML once and returns an Engine ready to extract.
+func New(rawHTML string) (*Engine, error) <span class="cov8" title="1">{
+        gqDoc, err := goquery.NewDocumentFromReader(strings.NewReader(rawHTML))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("parse html (goquery): %w", err)
+        }</span>
+
+        <span class="cov8" title="1">xpathDoc, err := htmlquery.Parse(strings.NewReader(rawHTML))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("parse html (htmlquery): %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return &amp;Engine{gqDoc: gqDoc, xpathDoc: xpathDoc}, nil</span>
+}
+
+// Extract runs all fields in the template against the parsed document.
+func (e *Engine) Extract(tmpl *Template) (*Result, error) <span class="cov8" title="1">{
+        result := &amp;Result{
+                Data:        make(map[string]any),
+                FieldErrors: make(map[string]string),
+        }
+
+        for _, field := range tmpl.Fields </span><span class="cov8" title="1">{
+                raw, err := e.extractField(field)
+                if err != nil </span><span class="cov0" title="0">{
+                        if field.Required </span><span class="cov0" title="0">{
+                                return nil, &amp;ExtractionError{FieldName: field.Name}
+                        }</span>
+                        <span class="cov0" title="0">result.FieldErrors[field.Name] = err.Error()
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if raw == "" </span><span class="cov8" title="1">{
+                        if field.Required </span><span class="cov8" title="1">{
+                                return nil, &amp;ExtractionError{FieldName: field.Name}
+                        }</span>
+                        <span class="cov8" title="1">result.FieldErrors[field.Name] = "no extractor yielded a value"
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">transformed := applyTransform(raw, field.Transform)
+                if transformed == "" &amp;&amp; field.Required </span><span class="cov8" title="1">{
+                        return nil, &amp;ExtractionError{FieldName: field.Name}
+                }</span>
+
+                <span class="cov8" title="1">coerced, err := coerce(transformed, field.Type, field.ItemType)
+                if err != nil </span><span class="cov8" title="1">{
+                        if field.Required </span><span class="cov0" title="0">{
+                                return nil, &amp;ExtractionError{FieldName: field.Name}
+                        }</span>
+                        <span class="cov8" title="1">result.FieldErrors[field.Name] = err.Error()
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">result.Data[field.Name] = coerced</span>
+        }
+
+        <span class="cov8" title="1">return result, nil</span>
+}
+
+// extractField tries each extractor in order; returns the first non-empty value.
+func (e *Engine) extractField(field Field) (string, error) <span class="cov8" title="1">{
+        isArray := field.Type == "array"
+
+        for _, ext := range field.Extractors </span><span class="cov8" title="1">{
+                val, err := e.runExtractor(ext, isArray)
+                if err != nil </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if val != "" </span><span class="cov8" title="1">{
+                        return val, nil
+                }</span>
+        }
+
+        <span class="cov8" title="1">return "", nil</span>
+}
+
+func (e *Engine) runExtractor(ext Extractor, multiple bool) (string, error) <span class="cov8" title="1">{
+        switch ext.Strategy </span>{
+        case "css":<span class="cov8" title="1">
+                return e.runCSS(ext, multiple)</span>
+        case "xpath":<span class="cov8" title="1">
+                return e.runXPath(ext, multiple)</span>
+        case "schema_org":<span class="cov8" title="1">
+                return e.runSchemaOrg(ext)</span>
+        case "microdata":<span class="cov8" title="1">
+                return e.runMicrodata(ext, multiple)</span>
+        case "meta":<span class="cov8" title="1">
+                return e.runMeta(ext)</span>
+        case "json_ld":<span class="cov8" title="1">
+                return e.runJSONLD(ext)</span>
+        default:<span class="cov8" title="1">
+                return "", fmt.Errorf("unknown strategy: %s", ext.Strategy)</span>
+        }
+}
+
+// encodeArray marshals a string slice to a JSON array string for uniform coerce() handling.
+func encodeArray(parts []string) string <span class="cov8" title="1">{
+        if len(parts) == 0 </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+        <span class="cov8" title="1">b, _ := json.Marshal(parts)
+        return string(b)</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package extractor
+
+import (
+        "strings"
+
+        "github.com/PuerkitoBio/goquery"
+        "github.com/tidwall/gjson"
+)
+
+// jsonLDBlocks lazily parses all &lt;script type="application/ld+json"&gt; text content.
+func (e *Engine) jsonLDBlocks() []string <span class="cov8" title="1">{
+        if e.jsonLDOnce != nil </span><span class="cov8" title="1">{
+                return e.jsonLDOnce
+        }</span>
+
+        <span class="cov8" title="1">e.gqDoc.Find(`script[type="application/ld+json"]`).Each(func(_ int, s *goquery.Selection) </span><span class="cov8" title="1">{
+                if text := strings.TrimSpace(s.Text()); text != "" </span><span class="cov8" title="1">{
+                        e.jsonLDOnce = append(e.jsonLDOnce, text)
+                }</span>
+        })
+
+        <span class="cov8" title="1">if e.jsonLDOnce == nil </span><span class="cov8" title="1">{
+                e.jsonLDOnce = []string{}
+        }</span>
+
+        <span class="cov8" title="1">return e.jsonLDOnce</span>
+}
+
+func (e *Engine) runJSONLD(ext Extractor) (string, error) <span class="cov8" title="1">{
+        blocks := e.jsonLDBlocks()
+        if ext.BlockIndex &gt;= len(blocks) </span><span class="cov8" title="1">{
+                return "", nil
+        }</span>
+
+        <span class="cov8" title="1">return gjson.Get(blocks[ext.BlockIndex], ext.Path).String(), nil</span>
+}
+
+func (e *Engine) runSchemaOrg(ext Extractor) (string, error) <span class="cov8" title="1">{
+        blocks := e.jsonLDBlocks()
+        schemaTypeLower := strings.ToLower(ext.SchemaType)
+        wildcard := schemaTypeLower == "*" || schemaTypeLower == ""
+
+        for _, block := range blocks </span><span class="cov8" title="1">{
+                result := gjson.Parse(block)
+
+                // Top-level array: treat each element as an independent block.
+                if result.IsArray() </span><span class="cov8" title="1">{
+                        var found string
+                        result.ForEach(func(_, item gjson.Result) bool </span><span class="cov8" title="1">{
+                                found = e.matchSchemaItem(item, ext.Path, schemaTypeLower, wildcard)
+                                return found == ""
+                        }</span>)
+                        <span class="cov8" title="1">if found != "" </span><span class="cov8" title="1">{
+                                return found, nil
+                        }</span>
+                        <span class="cov0" title="0">continue</span>
+                }
+
+                <span class="cov8" title="1">if graph := result.Get("@graph"); graph.Exists() </span><span class="cov8" title="1">{
+                        var found string
+                        graph.ForEach(func(_, item gjson.Result) bool </span><span class="cov8" title="1">{
+                                found = e.matchSchemaItem(item, ext.Path, schemaTypeLower, wildcard)
+                                return found == ""
+                        }</span>)
+                        <span class="cov8" title="1">if found != "" </span><span class="cov8" title="1">{
+                                return found, nil
+                        }</span>
+                        <span class="cov0" title="0">continue</span>
+                }
+
+                <span class="cov8" title="1">if wildcard || matchesSchemaType(result, schemaTypeLower) </span><span class="cov8" title="1">{
+                        if val := result.Get(ext.Path); val.Exists() </span><span class="cov8" title="1">{
+                                return val.String(), nil
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return "", nil</span>
+}
+
+func (e *Engine) matchSchemaItem(item gjson.Result, path, schemaTypeLower string, wildcard bool) string <span class="cov8" title="1">{
+        if wildcard || matchesSchemaType(item, schemaTypeLower) </span><span class="cov8" title="1">{
+                if v := item.Get(path); v.Exists() </span><span class="cov8" title="1">{
+                        return v.String()
+                }</span>
+        }
+        <span class="cov8" title="1">return ""</span>
+}
+
+func matchesSchemaType(result gjson.Result, typeLower string) bool <span class="cov8" title="1">{
+        t := result.Get("@type")
+        if !t.Exists() </span><span class="cov8" title="1">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">if t.Type == gjson.String </span><span class="cov8" title="1">{
+                return strings.ToLower(t.String()) == typeLower
+        }</span>
+
+        <span class="cov8" title="1">if t.IsArray() </span><span class="cov8" title="1">{
+                for _, v := range t.Array() </span><span class="cov8" title="1">{
+                        if strings.ToLower(v.String()) == typeLower </span><span class="cov8" title="1">{
+                                return true
+                        }</span>
+                }
+        }
+
+        <span class="cov0" title="0">return false</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package extractor
+
+import (
+        "regexp"
+        "strings"
+)
+
+// applyTransform runs the optional transform pipeline on a raw string value.
+// Trimming is applied by default unless explicitly disabled.
+func applyTransform(raw string, t *Transform) string <span class="cov8" title="1">{
+        if t == nil </span><span class="cov8" title="1">{
+                return strings.TrimSpace(raw)
+        }</span>
+
+        <span class="cov8" title="1">result := raw
+
+        if t.Trim == nil || *t.Trim </span><span class="cov8" title="1">{
+                result = strings.TrimSpace(result)
+        }</span>
+
+        <span class="cov8" title="1">if t.Regex != "" </span><span class="cov8" title="1">{
+                re, err := regexp.Compile(t.Regex)
+                if err != nil </span><span class="cov8" title="1">{
+                        return ""
+                }</span>
+
+                <span class="cov8" title="1">match := re.FindStringSubmatch(result)
+                if match == nil </span><span class="cov8" title="1">{
+                        return ""
+                }</span>
+
+                <span class="cov8" title="1">if len(match) &gt; 1 </span><span class="cov8" title="1">{
+                        result = match[1]
+                }</span> else<span class="cov8" title="1"> {
+                        result = match[0]
+                }</span>
+        }
+
+        <span class="cov8" title="1">result = t.Prepend + result + t.Append
+
+        return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package extractor
+
+import (
+        "github.com/antchfx/htmlquery"
+        "golang.org/x/net/html"
+)
+
+func (e *Engine) runXPath(ext Extractor, multiple bool) (string, error) <span class="cov8" title="1">{
+        nodes, err := htmlquery.QueryAll(e.xpathDoc, ext.Selector)
+        if err != nil </span><span class="cov8" title="1">{
+                return "", err
+        }</span>
+
+        <span class="cov8" title="1">if len(nodes) == 0 </span><span class="cov8" title="1">{
+                return "", nil
+        }</span>
+
+        <span class="cov8" title="1">extract := func(n *html.Node) string </span><span class="cov8" title="1">{
+                attr := ext.Attribute
+                if attr == "" || attr == "innerText" </span><span class="cov8" title="1">{
+                        return htmlquery.InnerText(n)
+                }</span>
+
+                <span class="cov8" title="1">return htmlquery.SelectAttr(n, attr)</span>
+        }
+
+        <span class="cov8" title="1">if multiple </span><span class="cov8" title="1">{
+                parts := make([]string, 0, len(nodes))
+                for _, n := range nodes </span><span class="cov8" title="1">{
+                        if v := extract(n); v != "" </span><span class="cov8" title="1">{
+                                parts = append(parts, v)
+                        }</span>
+                }
+
+                <span class="cov8" title="1">return encodeArray(parts), nil</span>
+        }
+
+        <span class="cov8" title="1">return extract(nodes[0]), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package lifecycle
+
+import (
+        "context"
+        "fmt"
+        "log/slog"
+        "time"
+
+        "golang.org/x/sync/errgroup"
+)
+
+// APIClient is the interface the Agent uses to communicate with the orchestrator.
+type APIClient interface {
+        Register(ctx context.Context) error
+        Heartbeat(ctx context.Context) error
+}
+
+// Worker is the interface for the job polling loop.
+type Worker interface {
+        Run(ctx context.Context) error
+}
+
+// Agent manages registration, periodic heartbeats, and job processing.
+type Agent struct {
+        client   APIClient
+        worker   Worker
+        interval time.Duration
+        logger   *slog.Logger
+}
+
+// New creates an Agent that sends heartbeats on the given interval and runs the worker.
+func New(client APIClient, worker Worker, interval time.Duration, logger *slog.Logger) *Agent <span class="cov8" title="1">{
+        return &amp;Agent{
+                client:   client,
+                worker:   worker,
+                interval: interval,
+                logger:   logger,
+        }
+}</span>
+
+// Run registers the agent, then runs heartbeats and job polling concurrently until ctx is cancelled.
+func (a *Agent) Run(ctx context.Context) error <span class="cov8" title="1">{
+        if a.interval &lt;= 0 </span><span class="cov8" title="1">{
+                return fmt.Errorf("invalid heartbeat interval: %s", a.interval)
+        }</span>
+
+        <span class="cov8" title="1">a.logger.Info("registering with orchestrator")
+
+        if err := a.client.Register(ctx); err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("register: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">a.logger.Info("registration successful, starting heartbeat and worker loops", "interval", a.interval)
+
+        g, gctx := errgroup.WithContext(ctx)
+
+        g.Go(func() error </span><span class="cov8" title="1">{
+                return a.heartbeatLoop(gctx)
+        }</span>)
+
+        <span class="cov8" title="1">g.Go(func() error </span><span class="cov8" title="1">{
+                return a.worker.Run(gctx)
+        }</span>)
+
+        <span class="cov8" title="1">return g.Wait()</span>
+}
+
+func (a *Agent) heartbeatLoop(ctx context.Context) error <span class="cov8" title="1">{
+        if err := a.client.Heartbeat(ctx); err != nil </span><span class="cov8" title="1">{
+                a.logger.Warn("heartbeat failed", "error", err)
+        }</span> else<span class="cov8" title="1"> {
+                a.logger.Debug("heartbeat sent")
+        }</span>
+
+        <span class="cov8" title="1">ticker := time.NewTicker(a.interval)
+        defer ticker.Stop()
+
+        for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        a.logger.Info("shutting down")
+                        return nil</span>
+                case &lt;-ticker.C:<span class="cov8" title="1">
+                        if err := a.client.Heartbeat(ctx); err != nil </span><span class="cov8" title="1">{
+                                a.logger.Warn("heartbeat failed", "error", err)
+                        }</span> else<span class="cov8" title="1"> {
+                                a.logger.Debug("heartbeat sent")
+                        }</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package scraper
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "log/slog"
+        "time"
+
+        "github.com/chromedp/cdproto/page"
+        "github.com/chromedp/chromedp"
+)
+
+// ScrapeError is a classified error from page fetching.
+type ScrapeError struct {
+        Type    string // matches error_type enum values on the orchestrator
+        Message string
+}
+
+func (e *ScrapeError) Error() string <span class="cov8" title="1">{ return fmt.Sprintf("%s: %s", e.Type, e.Message) }</span>
+
+// Result holds the rendered page data captured by the scraper.
+type Result struct {
+        HTML       string
+        Screenshot []byte // raw PNG bytes; may be empty if capture failed
+}
+
+// Scraper fetches fully-rendered pages via headless Chrome.
+type Scraper struct {
+        logger *slog.Logger
+}
+
+// New returns a Scraper ready to fetch pages.
+func New(logger *slog.Logger) *Scraper <span class="cov8" title="1">{
+        return &amp;Scraper{logger: logger}
+}</span>
+
+// Fetch navigates to url, optionally waits for waitSelector to appear in the
+// DOM, then returns the fully rendered HTML and a viewport screenshot.
+// On page_timeout the partial result (whatever loaded) is returned alongside the error.
+func (s *Scraper) Fetch(ctx context.Context, rawURL, waitSelector string, timeout time.Duration) (*Result, error) <span class="cov0" title="0">{
+        allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx,
+                chromedp.NoFirstRun,
+                chromedp.NoDefaultBrowserCheck,
+                chromedp.Headless,
+                chromedp.DisableGPU,
+                chromedp.Flag("no-sandbox", true),
+                chromedp.Flag("disable-dev-shm-usage", true),
+                // Stealth: suppress automation signals that trigger bot-detection.
+                chromedp.Flag("disable-blink-features", "AutomationControlled"),
+                chromedp.Flag("enable-automation", false),
+                chromedp.Flag("disable-infobars", true),
+                chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),
+        )
+        defer cancelAlloc()
+
+        tabCtx, cancelTab := chromedp.NewContext(allocCtx)
+        defer cancelTab()
+
+        timeoutCtx, cancelTimeout := context.WithTimeout(tabCtx, timeout)
+        defer cancelTimeout()
+
+        var html string
+        var screenshot []byte
+
+        tasks := chromedp.Tasks{
+                // Hide navigator.webdriver before any page script runs.
+                chromedp.ActionFunc(func(ctx context.Context) error </span><span class="cov0" title="0">{
+                        _, err := page.AddScriptToEvaluateOnNewDocument(
+                                `Object.defineProperty(navigator,'webdriver',{get:()=&gt;undefined})`,
+                        ).Do(ctx)
+                        return err
+                }</span>),
+                chromedp.Navigate(rawURL),
+                // Wait for the body to exist, then allow JS/CSS to paint.
+                chromedp.WaitReady("body", chromedp.ByQuery),
+                chromedp.Sleep(1500 * time.Millisecond),
+                // Scroll down then back to top to trigger lazy-loaded content.
+                chromedp.Evaluate(`window.scrollTo(0, (document.body||document.documentElement).scrollHeight)`, nil),
+                chromedp.Sleep(500 * time.Millisecond),
+                chromedp.Evaluate(`window.scrollTo(0, 0)`, nil),
+                chromedp.Sleep(300 * time.Millisecond),
+        }
+
+        <span class="cov0" title="0">if waitSelector != "" </span><span class="cov0" title="0">{
+                tasks = append(tasks, chromedp.WaitVisible(waitSelector, chromedp.ByQuery))
+        }</span>
+
+        <span class="cov0" title="0">tasks = append(tasks,
+                chromedp.CaptureScreenshot(&amp;screenshot),
+                chromedp.OuterHTML("html", &amp;html),
+        )
+
+        if err := chromedp.Run(timeoutCtx, tasks...); err != nil </span><span class="cov0" title="0">{
+                if errors.Is(err, context.DeadlineExceeded) </span><span class="cov0" title="0">{
+                        // Best-effort: capture whatever loaded using the non-timeout tab context.
+                        _ = chromedp.Run(tabCtx,
+                                chromedp.CaptureScreenshot(&amp;screenshot),
+                                chromedp.OuterHTML("html", &amp;html),
+                        )
+                        return &amp;Result{HTML: html, Screenshot: screenshot}, &amp;ScrapeError{
+                                Type:    "page_timeout",
+                                Message: fmt.Sprintf("page did not load within %s", timeout),
+                        }
+                }</span>
+
+                <span class="cov0" title="0">return nil, &amp;ScrapeError{
+                        Type:    "navigation_error",
+                        Message: err.Error(),
+                }</span>
+        }
+
+        <span class="cov0" title="0">s.logger.Debug("page fetched", "url", rawURL, "html_bytes", len(html), "screenshot_bytes", len(screenshot))
+
+        return &amp;Result{HTML: html, Screenshot: screenshot}, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package worker
+
+import (
+        "context"
+        "encoding/json"
+        "errors"
+        "fmt"
+        "log/slog"
+        "math/rand"
+        "time"
+
+        "github.com/markusheinemann/scfleet/agent/internal/api"
+        "github.com/markusheinemann/scfleet/agent/internal/extractor"
+        "github.com/markusheinemann/scfleet/agent/internal/scraper"
+)
+
+// APIClient is the interface the Worker uses to communicate with the orchestrator.
+type APIClient interface {
+        PollJob(ctx context.Context) (*api.ClaimedJob, error)
+        CompleteJob(ctx context.Context, jobID string, req api.CompleteJobRequest) error
+        FailJob(ctx context.Context, jobID string, req api.FailJobRequest) error
+        UploadArtifacts(ctx context.Context, jobID string, screenshot []byte, html string) error
+}
+
+// Scraper is the interface the Worker uses to fetch pages.
+type Scraper interface {
+        Fetch(ctx context.Context, url, waitSelector string, timeout time.Duration) (*scraper.Result, error)
+}
+
+// Worker runs the poll → scrape → extract → report loop.
+type Worker struct {
+        client      APIClient
+        scraper     Scraper
+        logger      *slog.Logger
+        pollBase    time.Duration
+        pollMax     time.Duration
+        pollCurrent time.Duration
+}
+
+// New creates a Worker with exponential backoff polling between pollBase and pollMax.
+func New(client APIClient, s Scraper, pollBase, pollMax time.Duration, logger *slog.Logger) *Worker <span class="cov8" title="1">{
+        return &amp;Worker{
+                client:  client,
+                scraper: s,
+                logger:  logger,
+                pollBase: pollBase,
+                pollMax:  pollMax,
+        }
+}</span>
+
+// Run polls for jobs until ctx is cancelled.
+func (w *Worker) Run(ctx context.Context) error <span class="cov8" title="1">{
+        w.pollCurrent = w.pollBase
+
+        for </span><span class="cov8" title="1">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov8" title="1">
+                        return nil</span>
+                case &lt;-time.After(w.pollCurrent):<span class="cov8" title="1">
+                        found, err := w.processOnce(ctx)
+                        if err != nil </span><span class="cov8" title="1">{
+                                w.logger.Warn("job processing error", "error", err)
+                                w.backoff()
+                        }</span> else<span class="cov8" title="1"> if found </span><span class="cov8" title="1">{
+                                w.pollCurrent = w.pollBase
+                        }</span> else<span class="cov8" title="1"> {
+                                w.backoff()
+                        }</span>
+                }
+        }
+}
+
+// processOnce polls for one job and executes it. Returns true if a job was found.
+func (w *Worker) processOnce(ctx context.Context) (bool, error) <span class="cov8" title="1">{
+        job, err := w.client.PollJob(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return false, fmt.Errorf("poll: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if job == nil </span><span class="cov8" title="1">{
+                w.logger.Debug("no pending jobs")
+                return false, nil
+        }</span>
+
+        <span class="cov8" title="1">w.logger.Info("claimed job", "job_id", job.JobID, "url", job.URL)
+
+        return true, w.executeJob(ctx, job)</span>
+}
+
+func (w *Worker) executeJob(ctx context.Context, job *api.ClaimedJob) error <span class="cov8" title="1">{
+        var tmpl extractor.Template
+        if err := json.Unmarshal(job.Template, &amp;tmpl); err != nil </span><span class="cov8" title="1">{
+                return w.reportFail(ctx, job.JobID, "extraction_error", "invalid template JSON: "+err.Error())
+        }</span>
+
+        <span class="cov8" title="1">pageTimeout := time.Duration(job.TimeoutS) * time.Second
+        if tmpl.PageTimeoutS &gt; 0 </span><span class="cov8" title="1">{
+                pageTimeout = time.Duration(tmpl.PageTimeoutS) * time.Second
+        }</span>
+
+        <span class="cov8" title="1">if pageTimeout &lt;= 0 </span><span class="cov8" title="1">{
+                pageTimeout = 30 * time.Second
+        }</span>
+
+        <span class="cov8" title="1">fetched, fetchErr := w.scraper.Fetch(ctx, job.URL, tmpl.JSWaitSelector, pageTimeout)
+
+        if fetched != nil </span><span class="cov8" title="1">{
+                if err := w.client.UploadArtifacts(ctx, job.JobID, fetched.Screenshot, fetched.HTML); err != nil </span><span class="cov0" title="0">{
+                        w.logger.Warn("failed to upload artifacts", "job_id", job.JobID, "error", err)
+                }</span>
+        }
+
+        <span class="cov8" title="1">if fetchErr != nil </span><span class="cov8" title="1">{
+                var se *scraper.ScrapeError
+                if errors.As(fetchErr, &amp;se) </span><span class="cov8" title="1">{
+                        return w.reportFail(ctx, job.JobID, se.Type, se.Message)
+                }</span>
+
+                <span class="cov8" title="1">return w.reportFail(ctx, job.JobID, "navigation_error", fetchErr.Error())</span>
+        }
+
+        <span class="cov8" title="1">engine, err := extractor.New(fetched.HTML)
+        if err != nil </span><span class="cov0" title="0">{
+                return w.reportFail(ctx, job.JobID, "extraction_error", "failed to parse HTML: "+err.Error())
+        }</span>
+
+        <span class="cov8" title="1">result, err := engine.Extract(&amp;tmpl)
+        if err != nil </span><span class="cov8" title="1">{
+                var ee *extractor.ExtractionError
+                if errors.As(err, &amp;ee) </span><span class="cov8" title="1">{
+                        return w.reportFail(ctx, job.JobID, "missing_required_field",
+                                fmt.Sprintf("required field %q: no extractor yielded a value", ee.FieldName))
+                }</span>
+
+                <span class="cov0" title="0">return w.reportFail(ctx, job.JobID, "extraction_error", err.Error())</span>
+        }
+
+        <span class="cov8" title="1">w.logger.Info("job completed", "job_id", job.JobID, "fields", len(result.Data))
+
+        return w.client.CompleteJob(ctx, job.JobID, api.CompleteJobRequest{
+                Result:      result.Data,
+                FieldErrors: result.FieldErrors,
+        })</span>
+}
+
+func (w *Worker) reportFail(ctx context.Context, jobID, errType, errMsg string) error <span class="cov8" title="1">{
+        w.logger.Warn("job failed", "job_id", jobID, "error_type", errType, "error", errMsg)
+
+        return w.client.FailJob(ctx, jobID, api.FailJobRequest{
+                ErrorType:    errType,
+                ErrorMessage: errMsg,
+        })
+}</span>
+
+// backoff doubles the poll interval up to pollMax with ±25% jitter to prevent
+// thundering herd when many idle agents poll simultaneously.
+func (w *Worker) backoff() <span class="cov8" title="1">{
+        next := w.pollCurrent * 2
+        if next &gt; w.pollMax </span><span class="cov8" title="1">{
+                next = w.pollMax
+        }</span>
+
+        // ±25% jitter
+        <span class="cov8" title="1">jitter := time.Duration(rand.Int63n(int64(next/2))) - next/4 //nolint:gosec
+        w.pollCurrent = next + jitter
+
+        if w.pollCurrent &lt; w.pollBase </span><span class="cov0" title="0">{
+                w.pollCurrent = w.pollBase
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

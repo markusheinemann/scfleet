@@ -28,11 +28,12 @@ type Result struct {
 // Scraper fetches fully-rendered pages via headless Chrome.
 type Scraper struct {
 	logger *slog.Logger
+	run    func(context.Context, ...chromedp.Action) error
 }
 
 // New returns a Scraper ready to fetch pages.
 func New(logger *slog.Logger) *Scraper {
-	return &Scraper{logger: logger}
+	return &Scraper{logger: logger, run: chromedp.Run}
 }
 
 // Fetch navigates to url, optionally waits for waitSelector to appear in the
@@ -91,10 +92,10 @@ func (s *Scraper) Fetch(ctx context.Context, rawURL, waitSelector string, timeou
 		chromedp.OuterHTML("html", &html),
 	)
 
-	if err := chromedp.Run(timeoutCtx, tasks...); err != nil {
+	if err := s.run(timeoutCtx, tasks...); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			// Best-effort: capture whatever loaded using the non-timeout tab context.
-			_ = chromedp.Run(tabCtx,
+			_ = s.run(tabCtx,
 				chromedp.CaptureScreenshot(&screenshot),
 				chromedp.OuterHTML("html", &html),
 			)
