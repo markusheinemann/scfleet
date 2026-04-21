@@ -29,9 +29,14 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Partial indexes for efficient queue operations (PostgreSQL-specific)
-        DB::statement("CREATE INDEX idx_scrape_jobs_pending ON scrape_jobs (created_at ASC) WHERE status = 'pending'");
-        DB::statement("CREATE INDEX idx_scrape_jobs_timeout ON scrape_jobs (timeout_at ASC) WHERE status = 'processing'");
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("CREATE INDEX idx_scrape_jobs_pending ON scrape_jobs (created_at ASC) WHERE status = 'pending'");
+            DB::statement("CREATE INDEX idx_scrape_jobs_timeout ON scrape_jobs (timeout_at ASC) WHERE status = 'processing'");
+        } else {
+            // MySQL does not support partial indexes; use plain composite indexes instead.
+            DB::statement('CREATE INDEX idx_scrape_jobs_pending ON scrape_jobs (status, created_at)');
+            DB::statement('CREATE INDEX idx_scrape_jobs_timeout ON scrape_jobs (status, timeout_at)');
+        }
     }
 
     public function down(): void

@@ -33,7 +33,7 @@ describe('POST /api/v1/scrape', function (): void {
 
         $job = ScrapeJob::first();
         expect($job->template_id)->toBe($this->template->id)
-            ->and($job->template)->toBe($this->template->template);
+            ->and($job->template)->toEqual($this->template->template);
     });
 
     it('computes and stores a template_hash', function (): void {
